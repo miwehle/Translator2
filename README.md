@@ -21,6 +21,22 @@ Dieses Projekt enthaelt einen bewusst einfachen Seq2Seq-Translator mit:
 python simple_attention_translator.py --epochs 120
 ```
 
+## Checkpoint und Inferenz
+
+Training speichert automatisch ein Checkpoint unter `checkpoints/translator.pt` (anpassbar mit `--checkpoint-path`).
+
+Einzelsatz uebersetzen:
+
+```bash
+python simple_attention_translator.py --checkpoint-path checkpoints/translator.pt --translate "ich bin muede"
+```
+
+Interaktiv testen:
+
+```bash
+python simple_attention_translator.py --checkpoint-path checkpoints/translator.pt --interactive
+```
+
 ## Wichtige Parameter
 
 - `--epochs` (default: `200`)
@@ -30,6 +46,10 @@ python simple_attention_translator.py --epochs 120
 - `--lr` (default: `1e-3`)
 - `--num-heads` (default: `4`)
 - `--teacher-forcing` (default: `0.7`)
+- `--checkpoint-path` (default: `checkpoints/translator.pt`)
+- `--translate` (default: `None`)
+- `--interactive` (Flag)
+- `--max-len` (default: `30`, nur Inferenz)
 
 ## Hinweis
 
