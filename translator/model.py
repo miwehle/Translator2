@@ -1,135 +1,232 @@
-import random
 import math
-from typing import List, Tuple
+from typing import List
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
-class Encoder(nn.Module):
-    def __init__(self, vocab_size: int, emb_dim: int, hidden_dim: int, pad_idx: int):
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model: int, max_len: int = 1024):
         super().__init__()
-        self.embedding = nn.Embedding(vocab_size, emb_dim, padding_idx=pad_idx)
-        self.gru = nn.GRU(emb_dim, hidden_dim, batch_first=True)
+        pos = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
 
-    def forward(self, src: torch.Tensor, src_lens: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        emb = self.embedding(src)
-        packed = nn.utils.rnn.pack_padded_sequence(
-            emb, src_lens.cpu(), batch_first=True, enforce_sorted=False
+        pe = torch.zeros(max_len, d_model)
+        pe[:, 0::2] = torch.sin(pos * div)
+        pe[:, 1::2] = torch.cos(pos * div)
+        self.register_buffer("pe", pe.unsqueeze(0))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x + self.pe[:, : x.size(1)]
+
+
+class TransformerEncoderBlock(nn.Module):
+    def __init__(self, d_model: int, num_heads: int, ff_dim: int, dropout: float):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(d_model)
+        self.self_attn = nn.MultiheadAttention(
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
         )
-        enc_out_packed, hidden = self.gru(packed)
-        enc_out, _ = nn.utils.rnn.pad_packed_sequence(enc_out_packed, batch_first=True)
-        return enc_out, hidden
+        self.drop1 = nn.Dropout(dropout)
+
+        self.norm2 = nn.LayerNorm(d_model)
+        self.ff = nn.Sequential(
+            nn.Linear(d_model, ff_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(ff_dim, d_model),
+        )
+        self.drop2 = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor, src_key_padding_mask: torch.Tensor) -> torch.Tensor:
+        y = self.norm1(x)
+        attn_out, _ = self.self_attn(
+            y,
+            y,
+            y,
+            key_padding_mask=src_key_padding_mask,
+            need_weights=False,
+        )
+        x = x + self.drop1(attn_out)
+
+        y = self.norm2(x)
+        x = x + self.drop2(self.ff(y))
+        return x
 
 
-class ScaledDotProductCrossAttention(nn.Module):
-    # Transformer-aehnliche Multi-Head Scaled Dot-Product Cross-Attention.
-    def __init__(self, hidden_dim: int, attn_dim: int, num_heads: int):
+class TransformerDecoderBlock(nn.Module):
+    def __init__(self, d_model: int, num_heads: int, ff_dim: int, dropout: float):
         super().__init__()
-        if attn_dim % num_heads != 0:
-            raise ValueError("attn_dim must be divisible by num_heads")
-        self.q_proj = nn.Linear(hidden_dim, attn_dim, bias=False)
-        self.k_proj = nn.Linear(hidden_dim, attn_dim, bias=False)
-        self.v_proj = nn.Linear(hidden_dim, attn_dim, bias=False)
-        self.o_proj = nn.Linear(attn_dim, hidden_dim, bias=False)
-        self.num_heads = num_heads
-        self.head_dim = attn_dim // num_heads
-        self.scale = math.sqrt(self.head_dim)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.self_attn = nn.MultiheadAttention(
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.drop1 = nn.Dropout(dropout)
+
+        self.norm2 = nn.LayerNorm(d_model)
+        self.cross_attn = nn.MultiheadAttention(
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.drop2 = nn.Dropout(dropout)
+
+        self.norm3 = nn.LayerNorm(d_model)
+        self.ff = nn.Sequential(
+            nn.Linear(d_model, ff_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(ff_dim, d_model),
+        )
+        self.drop3 = nn.Dropout(dropout)
 
     def forward(
-        self, query: torch.Tensor, keys: torch.Tensor, values: torch.Tensor, mask: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        bsz, src_len, _ = keys.shape
-        q = self.q_proj(query)
-        k = self.k_proj(keys)
-        v = self.v_proj(values)
-
-        q = q.view(bsz, self.num_heads, self.head_dim)
-        k = k.view(bsz, src_len, self.num_heads, self.head_dim).transpose(1, 2)
-        v = v.view(bsz, src_len, self.num_heads, self.head_dim).transpose(1, 2)
-
-        scores = torch.matmul(k, q.unsqueeze(-1)).squeeze(-1) / self.scale
-        scores = scores.masked_fill(mask.unsqueeze(1) == 0, -1e9)
-        weights = F.softmax(scores, dim=-1)
-        context = torch.matmul(weights.unsqueeze(2), v).squeeze(2)
-        context = context.reshape(bsz, self.num_heads * self.head_dim)
-        context = self.o_proj(context)
-        return context, weights
-
-
-class Decoder(nn.Module):
-    def __init__(self, vocab_size: int, emb_dim: int, hidden_dim: int, pad_idx: int, num_heads: int = 4):
-        super().__init__()
-        self.embedding = nn.Embedding(vocab_size, emb_dim, padding_idx=pad_idx)
-        self.gru = nn.GRU(emb_dim + hidden_dim, hidden_dim, batch_first=True)
-        self.attn = ScaledDotProductCrossAttention(
-            hidden_dim=hidden_dim,
-            attn_dim=hidden_dim,
-            num_heads=num_heads,
-        )
-        self.out = nn.Linear(hidden_dim * 2, vocab_size)
-
-    def forward_step(
         self,
-        input_token: torch.Tensor,
-        hidden: torch.Tensor,
-        enc_out: torch.Tensor,
-        src_mask: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        emb = self.embedding(input_token).unsqueeze(1)
-        query = hidden[-1]
-        context, _ = self.attn(query, enc_out, enc_out, src_mask)
-        gru_input = torch.cat([emb, context.unsqueeze(1)], dim=-1)
-        dec_out, hidden = self.gru(gru_input, hidden)
-        logits = self.out(torch.cat([dec_out.squeeze(1), context], dim=-1))
-        return logits, hidden
+        x: torch.Tensor,
+        memory: torch.Tensor,
+        tgt_mask: torch.Tensor,
+        tgt_key_padding_mask: torch.Tensor,
+        src_key_padding_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        y = self.norm1(x)
+        self_attn_out, _ = self.self_attn(
+            y,
+            y,
+            y,
+            attn_mask=tgt_mask,
+            key_padding_mask=tgt_key_padding_mask,
+            need_weights=False,
+        )
+        x = x + self.drop1(self_attn_out)
+
+        y = self.norm2(x)
+        cross_attn_out, _ = self.cross_attn(
+            y,
+            memory,
+            memory,
+            key_padding_mask=src_key_padding_mask,
+            need_weights=False,
+        )
+        x = x + self.drop2(cross_attn_out)
+
+        y = self.norm3(x)
+        x = x + self.drop3(self.ff(y))
+        return x
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, encoder: Encoder, decoder: Decoder, tgt_sos_idx: int, src_pad_idx: int):
+    def __init__(
+        self,
+        src_vocab_size: int,
+        tgt_vocab_size: int,
+        d_model: int,
+        ff_dim: int,
+        num_heads: int,
+        num_layers: int,
+        src_pad_idx: int,
+        tgt_pad_idx: int,
+        tgt_sos_idx: int,
+        dropout: float = 0.1,
+        max_len: int = 1024,
+    ):
         super().__init__()
-        self.encoder = encoder
-        self.decoder = decoder
-        self.tgt_sos_idx = tgt_sos_idx
+        if d_model % num_heads != 0:
+            raise ValueError("d_model must be divisible by num_heads")
+
         self.src_pad_idx = src_pad_idx
+        self.tgt_pad_idx = tgt_pad_idx
+        self.tgt_sos_idx = tgt_sos_idx
+        self.d_model = d_model
+
+        self.src_embed = nn.Embedding(src_vocab_size, d_model, padding_idx=src_pad_idx)
+        self.tgt_embed = nn.Embedding(tgt_vocab_size, d_model, padding_idx=tgt_pad_idx)
+        self.pos_enc = PositionalEncoding(d_model, max_len=max_len)
+        self.embed_dropout = nn.Dropout(dropout)
+
+        self.encoder_layers = nn.ModuleList(
+            [
+                TransformerEncoderBlock(
+                    d_model=d_model,
+                    num_heads=num_heads,
+                    ff_dim=ff_dim,
+                    dropout=dropout,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+        self.decoder_layers = nn.ModuleList(
+            [
+                TransformerDecoderBlock(
+                    d_model=d_model,
+                    num_heads=num_heads,
+                    ff_dim=ff_dim,
+                    dropout=dropout,
+                )
+                for _ in range(num_layers)
+            ]
+        )
+
+        self.enc_final_norm = nn.LayerNorm(d_model)
+        self.dec_final_norm = nn.LayerNorm(d_model)
+        self.out_proj = nn.Linear(d_model, tgt_vocab_size)
+
+    def _causal_mask(self, length: int, device: torch.device) -> torch.Tensor:
+        return torch.triu(torch.ones(length, length, device=device, dtype=torch.bool), diagonal=1)
+
+    def encode(self, src: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        src_key_padding_mask = src == self.src_pad_idx
+        x = self.src_embed(src) * math.sqrt(self.d_model)
+        x = self.embed_dropout(self.pos_enc(x))
+        for layer in self.encoder_layers:
+            x = layer(x, src_key_padding_mask=src_key_padding_mask)
+        x = self.enc_final_norm(x)
+        return x, src_key_padding_mask
+
+    def decode(self, tgt_in: torch.Tensor, memory: torch.Tensor, src_key_padding_mask: torch.Tensor) -> torch.Tensor:
+        tgt_key_padding_mask = tgt_in == self.tgt_pad_idx
+        tgt_mask = self._causal_mask(tgt_in.size(1), tgt_in.device)
+
+        x = self.tgt_embed(tgt_in) * math.sqrt(self.d_model)
+        x = self.embed_dropout(self.pos_enc(x))
+        for layer in self.decoder_layers:
+            x = layer(
+                x,
+                memory=memory,
+                tgt_mask=tgt_mask,
+                tgt_key_padding_mask=tgt_key_padding_mask,
+                src_key_padding_mask=src_key_padding_mask,
+            )
+        x = self.dec_final_norm(x)
+        return self.out_proj(x)
 
     def forward(
-        self, src: torch.Tensor, src_lens: torch.Tensor, tgt: torch.Tensor, teacher_forcing: float = 0.5
+        self, src: torch.Tensor, src_lens: torch.Tensor, tgt: torch.Tensor, teacher_forcing: float = 1.0
     ) -> torch.Tensor:
-        bsz, tgt_len = tgt.shape
-        vocab_size = self.decoder.out.out_features
-        outputs = torch.zeros(bsz, tgt_len - 1, vocab_size, device=src.device)
-
-        enc_out, hidden = self.encoder(src, src_lens)
-        src_mask = (src != self.src_pad_idx).to(src.device)
-
-        dec_input = tgt[:, 0]
-        for t in range(1, tgt_len):
-            logits, hidden = self.decoder.forward_step(dec_input, hidden, enc_out, src_mask)
-            outputs[:, t - 1, :] = logits
-
-            use_tf = random.random() < teacher_forcing
-            next_input = tgt[:, t] if use_tf else logits.argmax(dim=-1)
-            dec_input = next_input
-        return outputs
+        del src_lens, teacher_forcing
+        memory, src_key_padding_mask = self.encode(src)
+        tgt_in = tgt[:, :-1]
+        return self.decode(tgt_in, memory, src_key_padding_mask)
 
     @torch.no_grad()
     def translate(
         self, src_ids: List[int], max_len: int, device: torch.device, eos_idx: int
     ) -> List[int]:
         src = torch.tensor([src_ids], dtype=torch.long, device=device)
-        src_lens = torch.tensor([len(src_ids)], dtype=torch.long, device=device)
-        enc_out, hidden = self.encoder(src, src_lens)
-        src_mask = (src != self.src_pad_idx).to(device)
+        memory, src_key_padding_mask = self.encode(src)
 
-        dec_input = torch.tensor([self.tgt_sos_idx], dtype=torch.long, device=device)
         out_ids: List[int] = [self.tgt_sos_idx]
         for _ in range(max_len):
-            logits, hidden = self.decoder.forward_step(dec_input, hidden, enc_out, src_mask)
-            dec_input = logits.argmax(dim=-1)
-            token = int(dec_input.item())
-            out_ids.append(token)
-            if token == eos_idx:
+            tgt_in = torch.tensor([out_ids], dtype=torch.long, device=device)
+            logits = self.decode(tgt_in, memory, src_key_padding_mask)
+            next_token = int(logits[:, -1, :].argmax(dim=-1).item())
+            out_ids.append(next_token)
+            if next_token == eos_idx:
                 break
         return out_ids

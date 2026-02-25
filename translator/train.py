@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 from .constants import EOS, PAD, SOS
 from .data import Vocab, TranslationDataset, collate_fn, set_seed, tiny_parallel_corpus
-from .model import Decoder, Encoder, Seq2Seq
+from .model import Seq2Seq
 
 
 def build_model(
@@ -17,19 +17,17 @@ def build_model(
     tgt_vocab: Vocab,
     device: torch.device,
 ) -> Seq2Seq:
-    encoder = Encoder(src_vocab.size, args.emb_dim, args.hidden_dim, src_vocab.stoi[PAD])
-    decoder = Decoder(
-        tgt_vocab.size,
-        args.emb_dim,
-        args.hidden_dim,
-        tgt_vocab.stoi[PAD],
-        num_heads=args.num_heads,
-    )
     model = Seq2Seq(
-        encoder,
-        decoder,
-        tgt_sos_idx=tgt_vocab.stoi[SOS],
+        src_vocab_size=src_vocab.size,
+        tgt_vocab_size=tgt_vocab.size,
+        d_model=args.emb_dim,
+        ff_dim=args.hidden_dim,
+        num_heads=args.num_heads,
+        num_layers=args.num_layers,
         src_pad_idx=src_vocab.stoi[PAD],
+        tgt_pad_idx=tgt_vocab.stoi[PAD],
+        tgt_sos_idx=tgt_vocab.stoi[SOS],
+        dropout=args.dropout,
     ).to(device)
     return model
 
@@ -51,6 +49,8 @@ def save_checkpoint(
             "emb_dim": args.emb_dim,
             "hidden_dim": args.hidden_dim,
             "num_heads": args.num_heads,
+            "num_layers": args.num_layers,
+            "dropout": args.dropout,
         },
     }
     torch.save(payload, path)
@@ -94,7 +94,7 @@ def train(args: argparse.Namespace) -> None:
             tgt = tgt.to(device)
 
             optim.zero_grad()
-            logits = model(src, src_lens, tgt, teacher_forcing=args.teacher_forcing)
+            logits = model(src, src_lens, tgt)
             loss = criterion(
                 logits.reshape(-1, logits.size(-1)),
                 tgt[:, 1:].reshape(-1),
@@ -130,9 +130,17 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
         emb_dim=hparams["emb_dim"],
         hidden_dim=hparams["hidden_dim"],
         num_heads=hparams["num_heads"],
+        num_layers=hparams.get("num_layers", 2),
+        dropout=hparams.get("dropout", 0.1),
     )
     model = build_model(model_args, src_vocab, tgt_vocab, device)
-    model.load_state_dict(ckpt["model_state_dict"])
+    try:
+        model.load_state_dict(ckpt["model_state_dict"])
+    except RuntimeError as exc:
+        raise RuntimeError(
+            "Checkpoint passt nicht zur aktuellen Modellarchitektur. "
+            "Bitte mit der aktuellen Transformer-Version neu trainieren."
+        ) from exc
     model.eval()
 
     def translate_text(text: str) -> str:
@@ -161,14 +169,15 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Minimaler Encoder-Decoder Translator mit Dot-Product-Attention")
+    p = argparse.ArgumentParser(description="Minimaler Transformer-Translator (Pre-Norm)")
     p.add_argument("--epochs", type=int, default=200)
     p.add_argument("--batch-size", type=int, default=4)
     p.add_argument("--emb-dim", type=int, default=64)
     p.add_argument("--hidden-dim", type=int, default=64)
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--num-heads", type=int, default=4)
-    p.add_argument("--teacher-forcing", type=float, default=0.7)
+    p.add_argument("--num-layers", type=int, default=2)
+    p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--checkpoint-path", type=str, default="checkpoints/translator.pt")
     p.add_argument("--translate", type=str, default=None)

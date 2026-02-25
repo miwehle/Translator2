@@ -1,18 +1,18 @@
-# Minimaler Encoder-Decoder-Translator (PyTorch)
+# Minimaler Transformer-Translator (PyTorch)
 
-Dieses Projekt enthaelt einen bewusst einfachen Seq2Seq-Translator mit:
+Dieses Projekt enthaelt einen bewusst einfachen Transformer-Translator mit:
 
-- GRU-Encoder
-- GRU-Decoder
-- Multi-Head Scaled Dot-Product Cross-Attention mit lernbaren Projektionen (`W_q`, `W_k`, `W_v`, `W_o`)
-- Teacher Forcing im Training
+- Transformer-Encoder mit Multi-Head Self-Attention
+- Transformer-Decoder mit Masked Self-Attention und Cross-Attention
+- Pre-Norm (LayerNorm vor jedem Sub-Block)
+- Feed-Forward-Netzwerken pro Block
 
 ## Struktur
 
 - `simple_attention_translator.py` (Entry-Point)
 - `translator/constants.py` (Sondertokens)
 - `translator/data.py` (Vokabular, Dataset, Collate, Toy-Korpus)
-- `translator/model.py` (Encoder, Decoder, Attention, Seq2Seq)
+- `translator/model.py` (Transformer-Modell)
 - `translator/train.py` (Training, CLI, Beispiel-Inferenz)
 
 ## Start
@@ -42,10 +42,11 @@ python simple_attention_translator.py --checkpoint-path checkpoints/translator.p
 - `--epochs` (default: `200`)
 - `--batch-size` (default: `4`)
 - `--emb-dim` (default: `64`)
-- `--hidden-dim` (default: `64`)
+- `--hidden-dim` (default: `64`, Feed-Forward-Dimension)
 - `--lr` (default: `1e-3`)
 - `--num-heads` (default: `4`)
-- `--teacher-forcing` (default: `0.7`)
+- `--num-layers` (default: `2`)
+- `--dropout` (default: `0.1`)
 - `--checkpoint-path` (default: `checkpoints/translator.pt`)
 - `--translate` (default: `None`)
 - `--interactive` (Flag)
