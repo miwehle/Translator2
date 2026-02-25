@@ -4,7 +4,7 @@ Dieses Projekt enthaelt einen bewusst einfachen Seq2Seq-Translator mit:
 
 - GRU-Encoder
 - GRU-Decoder
-- Scaled Dot-Product Cross-Attention mit lernbaren Projektionen (`W_q`, `W_k`, `W_v`, `W_o`)
+- Multi-Head Scaled Dot-Product Cross-Attention mit lernbaren Projektionen (`W_q`, `W_k`, `W_v`, `W_o`)
 - Teacher Forcing im Training
 
 ## Struktur
@@ -28,6 +28,7 @@ python simple_attention_translator.py --epochs 120
 - `--emb-dim` (default: `64`)
 - `--hidden-dim` (default: `64`)
 - `--lr` (default: `1e-3`)
+- `--num-heads` (default: `4`)
 - `--teacher-forcing` (default: `0.7`)
 
 ## Hinweis

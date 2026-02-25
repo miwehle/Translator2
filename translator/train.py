@@ -28,7 +28,13 @@ def train(args: argparse.Namespace) -> None:
     )
 
     encoder = Encoder(src_vocab.size, args.emb_dim, args.hidden_dim, src_vocab.stoi[PAD])
-    decoder = Decoder(tgt_vocab.size, args.emb_dim, args.hidden_dim, tgt_vocab.stoi[PAD])
+    decoder = Decoder(
+        tgt_vocab.size,
+        args.emb_dim,
+        args.hidden_dim,
+        tgt_vocab.stoi[PAD],
+        num_heads=args.num_heads,
+    )
     model = Seq2Seq(
         encoder,
         decoder,
@@ -77,6 +83,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--emb-dim", type=int, default=64)
     p.add_argument("--hidden-dim", type=int, default=64)
     p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--num-heads", type=int, default=4)
     p.add_argument("--teacher-forcing", type=float, default=0.7)
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()

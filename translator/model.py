@@ -24,35 +24,50 @@ class Encoder(nn.Module):
 
 
 class ScaledDotProductCrossAttention(nn.Module):
-    def __init__(self, hidden_dim: int, attn_dim: int):
+    # Transformer-aehnliche Multi-Head Scaled Dot-Product Cross-Attention.
+    def __init__(self, hidden_dim: int, attn_dim: int, num_heads: int):
         super().__init__()
+        if attn_dim % num_heads != 0:
+            raise ValueError("attn_dim must be divisible by num_heads")
         self.q_proj = nn.Linear(hidden_dim, attn_dim, bias=False)
         self.k_proj = nn.Linear(hidden_dim, attn_dim, bias=False)
         self.v_proj = nn.Linear(hidden_dim, attn_dim, bias=False)
         self.o_proj = nn.Linear(attn_dim, hidden_dim, bias=False)
-        self.scale = math.sqrt(attn_dim)
+        self.num_heads = num_heads
+        self.head_dim = attn_dim // num_heads
+        self.scale = math.sqrt(self.head_dim)
 
     def forward(
         self, query: torch.Tensor, keys: torch.Tensor, values: torch.Tensor, mask: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        bsz, src_len, _ = keys.shape
         q = self.q_proj(query)
         k = self.k_proj(keys)
         v = self.v_proj(values)
 
-        scores = torch.bmm(k, q.unsqueeze(-1)).squeeze(-1) / self.scale
-        scores = scores.masked_fill(mask == 0, -1e9)
+        q = q.view(bsz, self.num_heads, self.head_dim)
+        k = k.view(bsz, src_len, self.num_heads, self.head_dim).transpose(1, 2)
+        v = v.view(bsz, src_len, self.num_heads, self.head_dim).transpose(1, 2)
+
+        scores = torch.matmul(k, q.unsqueeze(-1)).squeeze(-1) / self.scale
+        scores = scores.masked_fill(mask.unsqueeze(1) == 0, -1e9)
         weights = F.softmax(scores, dim=-1)
-        context = torch.bmm(weights.unsqueeze(1), v).squeeze(1)
+        context = torch.matmul(weights.unsqueeze(2), v).squeeze(2)
+        context = context.reshape(bsz, self.num_heads * self.head_dim)
         context = self.o_proj(context)
         return context, weights
 
 
 class Decoder(nn.Module):
-    def __init__(self, vocab_size: int, emb_dim: int, hidden_dim: int, pad_idx: int):
+    def __init__(self, vocab_size: int, emb_dim: int, hidden_dim: int, pad_idx: int, num_heads: int = 4):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, emb_dim, padding_idx=pad_idx)
         self.gru = nn.GRU(emb_dim + hidden_dim, hidden_dim, batch_first=True)
-        self.attn = ScaledDotProductCrossAttention(hidden_dim=hidden_dim, attn_dim=hidden_dim)
+        self.attn = ScaledDotProductCrossAttention(
+            hidden_dim=hidden_dim,
+            attn_dim=hidden_dim,
+            num_heads=num_heads,
+        )
         self.out = nn.Linear(hidden_dim * 2, vocab_size)
 
     def forward_step(
