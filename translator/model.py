@@ -1,4 +1,5 @@
 import random
+import math
 from typing import List, Tuple
 
 import torch
@@ -22,14 +23,27 @@ class Encoder(nn.Module):
         return enc_out, hidden
 
 
-class DotAttention(nn.Module):
+class ScaledDotProductCrossAttention(nn.Module):
+    def __init__(self, hidden_dim: int, attn_dim: int):
+        super().__init__()
+        self.q_proj = nn.Linear(hidden_dim, attn_dim, bias=False)
+        self.k_proj = nn.Linear(hidden_dim, attn_dim, bias=False)
+        self.v_proj = nn.Linear(hidden_dim, attn_dim, bias=False)
+        self.o_proj = nn.Linear(attn_dim, hidden_dim, bias=False)
+        self.scale = math.sqrt(attn_dim)
+
     def forward(
-        self, query: torch.Tensor, keys: torch.Tensor, mask: torch.Tensor
+        self, query: torch.Tensor, keys: torch.Tensor, values: torch.Tensor, mask: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        scores = torch.bmm(keys, query.unsqueeze(-1)).squeeze(-1)
+        q = self.q_proj(query)
+        k = self.k_proj(keys)
+        v = self.v_proj(values)
+
+        scores = torch.bmm(k, q.unsqueeze(-1)).squeeze(-1) / self.scale
         scores = scores.masked_fill(mask == 0, -1e9)
         weights = F.softmax(scores, dim=-1)
-        context = torch.bmm(weights.unsqueeze(1), keys).squeeze(1)
+        context = torch.bmm(weights.unsqueeze(1), v).squeeze(1)
+        context = self.o_proj(context)
         return context, weights
 
 
@@ -38,7 +52,7 @@ class Decoder(nn.Module):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, emb_dim, padding_idx=pad_idx)
         self.gru = nn.GRU(emb_dim + hidden_dim, hidden_dim, batch_first=True)
-        self.attn = DotAttention()
+        self.attn = ScaledDotProductCrossAttention(hidden_dim=hidden_dim, attn_dim=hidden_dim)
         self.out = nn.Linear(hidden_dim * 2, vocab_size)
 
     def forward_step(
@@ -50,7 +64,7 @@ class Decoder(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         emb = self.embedding(input_token).unsqueeze(1)
         query = hidden[-1]
-        context, _ = self.attn(query, enc_out, src_mask)
+        context, _ = self.attn(query, enc_out, enc_out, src_mask)
         gru_input = torch.cat([emb, context.unsqueeze(1)], dim=-1)
         dec_out, hidden = self.gru(gru_input, hidden)
         logits = self.out(torch.cat([dec_out.squeeze(1), context], dim=-1))

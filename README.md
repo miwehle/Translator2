@@ -4,7 +4,7 @@ Dieses Projekt enthaelt einen bewusst einfachen Seq2Seq-Translator mit:
 
 - GRU-Encoder
 - GRU-Decoder
-- Dot-Product-Attention
+- Scaled Dot-Product Cross-Attention mit lernbaren Projektionen (`W_q`, `W_k`, `W_v`, `W_o`)
 - Teacher Forcing im Training
 
 ## Struktur
