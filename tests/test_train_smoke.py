@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+from uuid import uuid4
 
 import torch
 
@@ -40,6 +41,12 @@ def make_vocabs():
     return src_vocab, tgt_vocab
 
 
+def make_ckpt_path() -> Path:
+    artifacts = Path("tests/.test_artifacts")
+    artifacts.mkdir(parents=True, exist_ok=True)
+    return artifacts / f"{uuid4().hex}.pt"
+
+
 def test_build_model_returns_seq2seq():
     src_vocab, tgt_vocab = make_vocabs()
     args = make_args(Path("dummy.pt"))
@@ -50,9 +57,9 @@ def test_build_model_returns_seq2seq():
     assert isinstance(model, Seq2Seq)
 
 
-def test_save_and_load_checkpoint_roundtrip(tmp_path):
+def test_save_and_load_checkpoint_roundtrip():
     src_vocab, tgt_vocab = make_vocabs()
-    ckpt_path = tmp_path / "translator_test.pt"
+    ckpt_path = make_ckpt_path()
     args = make_args(ckpt_path)
     model = build_model(args, src_vocab, tgt_vocab, torch.device("cpu"))
 
@@ -67,8 +74,8 @@ def test_save_and_load_checkpoint_roundtrip(tmp_path):
     assert ckpt["hparams"]["num_layers"] == 1
 
 
-def test_train_writes_checkpoint(tmp_path):
-    ckpt_path = tmp_path / "trained.pt"
+def test_train_writes_checkpoint():
+    ckpt_path = make_ckpt_path()
     args = make_args(ckpt_path, epochs=1)
 
     train(args)
@@ -77,9 +84,9 @@ def test_train_writes_checkpoint(tmp_path):
     assert ckpt_path.stat().st_size > 0
 
 
-def test_run_translate_prints_output(monkeypatch, tmp_path, capsys):
+def test_run_translate_prints_output(monkeypatch, capsys):
     src_vocab, tgt_vocab = make_vocabs()
-    ckpt_path = tmp_path / "translator_test.pt"
+    ckpt_path = make_ckpt_path()
     args = make_args(ckpt_path)
     model = build_model(args, src_vocab, tgt_vocab, torch.device("cpu"))
     save_checkpoint(str(ckpt_path), model, src_vocab, tgt_vocab, args)
@@ -97,9 +104,9 @@ def test_run_translate_prints_output(monkeypatch, tmp_path, capsys):
     assert out != ""
 
 
-def test_run_translate_interactive_exit(monkeypatch, tmp_path, capsys):
+def test_run_translate_interactive_exit(monkeypatch, capsys):
     src_vocab, tgt_vocab = make_vocabs()
-    ckpt_path = tmp_path / "translator_test.pt"
+    ckpt_path = make_ckpt_path()
     args = make_args(ckpt_path)
     model = build_model(args, src_vocab, tgt_vocab, torch.device("cpu"))
     save_checkpoint(str(ckpt_path), model, src_vocab, tgt_vocab, args)
