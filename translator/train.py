@@ -64,28 +64,40 @@ def load_checkpoint(path: str, device: torch.device) -> Dict[str, Any]:
 
 def train(args: argparse.Namespace) -> None:
     set_seed(args.seed)
+    
+    def create_data_loader():
+        pairs = tiny_parallel_corpus()
+        src_vocab = Vocab.build([p[0] for p in pairs])
+        tgt_vocab = Vocab.build([p[1] for p in pairs])
+        dataset = TranslationDataset(pairs, src_vocab, tgt_vocab)
+        loader = DataLoader(
+            dataset,
+            batch_size=args.batch_size,
+            shuffle=True,
+            collate_fn=lambda batch: collate_fn(
+                batch, src_vocab.stoi[PAD], tgt_vocab.stoi[PAD]
+            ),
+        )
+        return pairs, src_vocab, tgt_vocab, loader
+
+    def print_sample_translations(model, pairs, src_vocab, tgt_vocab):
+        model.eval()
+        print("\nBeispiele:")
+        for src_text, _ in pairs[:5]:
+            src_ids = src_vocab.encode(src_text)
+            pred_ids = model.translate(
+                src_ids, max_len=20, device=device, eos_idx=tgt_vocab.stoi[EOS]
+            )
+            print(f"{src_text:20s} -> {tgt_vocab.decode(pred_ids)}")
+
+    pairs, src_vocab, tgt_vocab, loader = create_data_loader()
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    pairs = tiny_parallel_corpus()
-    src_vocab = Vocab.build([p[0] for p in pairs])
-    tgt_vocab = Vocab.build([p[1] for p in pairs])
-
-    dataset = TranslationDataset(pairs, src_vocab, tgt_vocab)
-    loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        collate_fn=lambda batch: collate_fn(
-            batch, src_vocab.stoi[PAD], tgt_vocab.stoi[PAD]
-        ),
-    )
-
     model = build_model(args, src_vocab, tgt_vocab, device)
-
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_vocab.stoi[PAD])
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
-
     model.train()
+
     for epoch in range(1, args.epochs + 1):
         total_loss = 0.0
         for src, src_lens, tgt, _ in loader:
@@ -106,14 +118,7 @@ def train(args: argparse.Namespace) -> None:
 
         print(f"Epoch {epoch:03d} | loss={total_loss / len(loader):.4f}")
 
-    model.eval()
-    print("\nBeispiele:")
-    for src_text, _ in pairs[:5]:
-        src_ids = src_vocab.encode(src_text)
-        pred_ids = model.translate(
-            src_ids, max_len=20, device=device, eos_idx=tgt_vocab.stoi[EOS]
-        )
-        print(f"{src_text:20s} -> {tgt_vocab.decode(pred_ids)}")
+    print_sample_translations(model, pairs, src_vocab, tgt_vocab)
 
     save_checkpoint(args.checkpoint_path, model, src_vocab, tgt_vocab, args)
 
