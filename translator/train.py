@@ -6,27 +6,26 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from .constants import EOS, PAD, SOS
-from .data import Vocab, TranslationDataset, collate_fn, set_seed, tiny_parallel_corpus
+from .data import Tokenizer, TranslationDataset, collate_fn, set_seed, tiny_parallel_corpus
 from .model import Seq2Seq
 
 
 def build_model(
     args: argparse.Namespace,
-    src_vocab: Vocab,
-    tgt_vocab: Vocab,
+    src_tokenizer: Tokenizer,
+    tgt_tokenizer: Tokenizer,
     device: torch.device,
 ) -> Seq2Seq:
     model = Seq2Seq(
-        src_vocab_size=src_vocab.size,
-        tgt_vocab_size=tgt_vocab.size,
+        src_vocab_size=src_tokenizer.vocab_size,
+        tgt_vocab_size=tgt_tokenizer.vocab_size,
         d_model=args.emb_dim,
         ff_dim=args.hidden_dim,
         num_heads=args.num_heads,
         num_layers=args.num_layers,
-        src_pad_idx=src_vocab.stoi[PAD],
-        tgt_pad_idx=tgt_vocab.stoi[PAD],
-        tgt_sos_idx=tgt_vocab.stoi[SOS],
+        src_pad_idx=src_tokenizer.pad_token_id,
+        tgt_pad_idx=tgt_tokenizer.pad_token_id,
+        tgt_sos_idx=tgt_tokenizer.sos_token_id,
         dropout=args.dropout,
     ).to(device)
     return model
@@ -35,16 +34,16 @@ def build_model(
 def save_checkpoint(
     path: str,
     model: Seq2Seq,
-    src_vocab: Vocab,
-    tgt_vocab: Vocab,
+    src_tokenizer: Tokenizer,
+    tgt_tokenizer: Tokenizer,
     args: argparse.Namespace,
 ) -> None:
     checkpoint_dir = Path(path).parent
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     payload: Dict[str, Any] = {
         "model_state_dict": model.state_dict(),
-        "src_vocab": {"stoi": src_vocab.stoi, "itos": src_vocab.itos},
-        "tgt_vocab": {"stoi": tgt_vocab.stoi, "itos": tgt_vocab.itos},
+        "src_tokenizer": {"stoi": src_tokenizer.stoi, "itos": src_tokenizer.itos},
+        "tgt_tokenizer": {"stoi": tgt_tokenizer.stoi, "itos": tgt_tokenizer.itos},
         "hparams": {
             "emb_dim": args.emb_dim,
             "hidden_dim": args.hidden_dim,
@@ -65,36 +64,36 @@ def load_checkpoint(path: str, device: torch.device) -> Dict[str, Any]:
 def train(args: argparse.Namespace) -> None:
     set_seed(args.seed)
     
-    def create_data_loader():
-        pairs = tiny_parallel_corpus()
-        src_vocab = Vocab.build([p[0] for p in pairs])
-        tgt_vocab = Vocab.build([p[1] for p in pairs])
-        dataset = TranslationDataset(pairs, src_vocab, tgt_vocab)
+    def create_data_loader(pairs, src_tokenizer, tgt_tokenizer):
+        dataset = TranslationDataset(pairs, src_tokenizer, tgt_tokenizer)
         loader = DataLoader(
             dataset,
             batch_size=args.batch_size,
             shuffle=True,
             collate_fn=lambda batch: collate_fn(
-                batch, src_vocab.stoi[PAD], tgt_vocab.stoi[PAD]
+                batch, src_tokenizer.pad_token_id, tgt_tokenizer.pad_token_id
             ),
         )
-        return pairs, src_vocab, tgt_vocab, loader
+        return loader
 
-    def print_sample_translations(model, pairs, src_vocab, tgt_vocab):
+    def print_sample_translations(model, pairs, src_tokenizer, tgt_tokenizer):
         model.eval()
         print("\nBeispiele:")
         for src_text, _ in pairs[:5]:
-            src_ids = src_vocab.encode(src_text)
+            src_ids = src_tokenizer.encode(src_text)
             pred_ids = model.translate(
-                src_ids, max_len=20, device=device, eos_idx=tgt_vocab.stoi[EOS]
+                src_ids, max_len=20, device=device, eos_idx=tgt_tokenizer.eos_token_id
             )
-            print(f"{src_text:20s} -> {tgt_vocab.decode(pred_ids)}")
+            print(f"{src_text:20s} -> {tgt_tokenizer.decode(pred_ids)}")
 
-    pairs, src_vocab, tgt_vocab, loader = create_data_loader()
+    pairs = tiny_parallel_corpus()
+    src_tokenizer = Tokenizer.build([p[0] for p in pairs])
+    tgt_tokenizer = Tokenizer.build([p[1] for p in pairs])
 
+    loader = create_data_loader(pairs, src_tokenizer, tgt_tokenizer)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = build_model(args, src_vocab, tgt_vocab, device)
-    criterion = nn.CrossEntropyLoss(ignore_index=tgt_vocab.stoi[PAD])
+    model = build_model(args, src_tokenizer, tgt_tokenizer, device)
+    criterion = nn.CrossEntropyLoss(ignore_index=tgt_tokenizer.pad_token_id)
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
     model.train()
 
@@ -118,17 +117,19 @@ def train(args: argparse.Namespace) -> None:
 
         print(f"Epoch {epoch:03d} | loss={total_loss / len(loader):.4f}")
 
-    print_sample_translations(model, pairs, src_vocab, tgt_vocab)
+    print_sample_translations(model, pairs, src_tokenizer, tgt_tokenizer)
 
-    save_checkpoint(args.checkpoint_path, model, src_vocab, tgt_vocab, args)
+    save_checkpoint(args.checkpoint_path, model, src_tokenizer, tgt_tokenizer, args)
 
 
 def run_translate(args: argparse.Namespace, interactive: bool) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = load_checkpoint(args.checkpoint_path, device)
 
-    src_vocab = Vocab(**ckpt["src_vocab"])
-    tgt_vocab = Vocab(**ckpt["tgt_vocab"])
+    src_data = ckpt.get("src_tokenizer", ckpt.get("src_vocab"))
+    tgt_data = ckpt.get("tgt_tokenizer", ckpt.get("tgt_vocab"))
+    src_tokenizer = Tokenizer(**src_data)
+    tgt_tokenizer = Tokenizer(**tgt_data)
     hparams = ckpt["hparams"]
 
     model_args = argparse.Namespace(
@@ -138,7 +139,7 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
         num_layers=hparams.get("num_layers", 2),
         dropout=hparams.get("dropout", 0.1),
     )
-    model = build_model(model_args, src_vocab, tgt_vocab, device)
+    model = build_model(model_args, src_tokenizer, tgt_tokenizer, device)
     try:
         model.load_state_dict(ckpt["model_state_dict"])
     except RuntimeError as exc:
@@ -149,11 +150,11 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
     model.eval()
 
     def translate_text(text: str) -> str:
-        src_ids = src_vocab.encode(text)
+        src_ids = src_tokenizer.encode(text)
         pred_ids = model.translate(
-            src_ids, max_len=args.max_len, device=device, eos_idx=tgt_vocab.stoi[EOS]
+            src_ids, max_len=args.max_len, device=device, eos_idx=tgt_tokenizer.eos_token_id
         )
-        return tgt_vocab.decode(pred_ids)
+        return tgt_tokenizer.decode(pred_ids)
 
     if interactive:
         print("Interaktiver Modus. Mit 'exit' beenden.")

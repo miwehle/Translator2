@@ -4,9 +4,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from translator.constants import EOS, PAD
 from translator.data import (
-    Vocab,
+    Tokenizer,
     TranslationDataset,
     collate_fn,
     set_seed,
@@ -34,23 +33,23 @@ def build_training_objects():
     device = torch.device("cpu")
 
     pairs = tiny_parallel_corpus()
-    src_vocab = Vocab.build([p[0] for p in pairs])
-    tgt_vocab = Vocab.build([p[1] for p in pairs])
+    src_tokenizer = Tokenizer.build([p[0] for p in pairs])
+    tgt_tokenizer = Tokenizer.build([p[1] for p in pairs])
 
-    dataset = TranslationDataset(pairs, src_vocab, tgt_vocab)
+    dataset = TranslationDataset(pairs, src_tokenizer, tgt_tokenizer)
     loader = DataLoader(
         dataset,
         batch_size=args.batch_size,
         shuffle=False,
         collate_fn=lambda batch: collate_fn(
-            batch, src_vocab.stoi[PAD], tgt_vocab.stoi[PAD]
+            batch, src_tokenizer.pad_token_id, tgt_tokenizer.pad_token_id
         ),
     )
 
-    model = build_model(args, src_vocab, tgt_vocab, device)
-    criterion = nn.CrossEntropyLoss(ignore_index=tgt_vocab.stoi[PAD])
+    model = build_model(args, src_tokenizer, tgt_tokenizer, device)
+    criterion = nn.CrossEntropyLoss(ignore_index=tgt_tokenizer.pad_token_id)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    return model, loader, criterion, optimizer, src_vocab, tgt_vocab, device, pairs
+    return model, loader, criterion, optimizer, src_tokenizer, tgt_tokenizer, device, pairs
 
 
 def batch_loss(model, criterion, batch, device):
@@ -62,16 +61,16 @@ def batch_loss(model, criterion, batch, device):
     return criterion(logits.reshape(-1, logits.size(-1)), tgt[:, 1:].reshape(-1))
 
 
-def translation_match_count(model, pairs, src_vocab, tgt_vocab, device, n_samples=5):
+def translation_match_count(model, pairs, src_tokenizer, tgt_tokenizer, device, n_samples=5):
     count = 0
     for src_text, tgt_text in pairs[:n_samples]:
         pred_ids = model.translate(
-            src_vocab.encode(src_text),
+            src_tokenizer.encode(src_text),
             max_len=20,
             device=device,
-            eos_idx=tgt_vocab.stoi[EOS],
+            eos_idx=tgt_tokenizer.eos_token_id,
         )
-        if tgt_vocab.decode(pred_ids) == tgt_text:
+        if tgt_tokenizer.decode(pred_ids) == tgt_text:
             count += 1
     return count
 
@@ -85,7 +84,7 @@ def test_loss_decreases_over_updates():
         initial_loss = float(batch_loss(model, criterion, first_batch, torch.device("cpu")).item())
 
     model.train()
-    for _ in range(40):
+    for _ in range(20):
         for batch in loader:
             optimizer.zero_grad()
             loss = batch_loss(model, criterion, batch, torch.device("cpu"))
@@ -97,17 +96,18 @@ def test_loss_decreases_over_updates():
     with torch.no_grad():
         final_loss = float(batch_loss(model, criterion, first_batch, torch.device("cpu")).item())
 
-    assert final_loss < initial_loss
+    min_abs_drop = 0.2
+    assert (initial_loss - final_loss) >= min_abs_drop
 
 
 def test_translation_quality_improves_after_training():
-    model, loader, criterion, optimizer, src_vocab, tgt_vocab, device, pairs = build_training_objects()
+    model, loader, criterion, optimizer, src_tokenizer, tgt_tokenizer, device, pairs = build_training_objects()
 
     model.eval()
-    before = translation_match_count(model, pairs, src_vocab, tgt_vocab, device)
+    before = translation_match_count(model, pairs, src_tokenizer, tgt_tokenizer, device)
 
     model.train()
-    for _ in range(60):
+    for _ in range(90):
         for batch in loader:
             optimizer.zero_grad()
             loss = batch_loss(model, criterion, batch, device)
@@ -116,6 +116,6 @@ def test_translation_quality_improves_after_training():
             optimizer.step()
 
     model.eval()
-    after = translation_match_count(model, pairs, src_vocab, tgt_vocab, device)
+    after = translation_match_count(model, pairs, src_tokenizer, tgt_tokenizer, device)
 
-    assert after > before
+    assert (after - before) == 5
