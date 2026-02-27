@@ -27,6 +27,7 @@ def make_args(checkpoint_path: Path, epochs: int = 1) -> argparse.Namespace:
         dropout=0.1,
         seed=42,
         checkpoint_path=str(checkpoint_path),
+        attention="torch",
         translate=None,
         interactive=False,
         max_len=20,
@@ -117,3 +118,21 @@ def test_run_translate_interactive_exit(monkeypatch, capsys):
     out = capsys.readouterr().out
 
     assert "Interaktiver Modus" in out
+
+
+def test_run_translate_raises_on_attention_mismatch():
+    src_tokenizer, tgt_tokenizer = make_vocabs()
+    ckpt_path = make_ckpt_path()
+    args = make_args(ckpt_path)
+    model = build_model(args, src_tokenizer, tgt_tokenizer, torch.device("cpu"))
+    save_checkpoint(str(ckpt_path), model, src_tokenizer, tgt_tokenizer, args)
+
+    infer_args = make_args(ckpt_path)
+    infer_args.translate = "ich bin muede"
+    infer_args.attention = "simple_sdp"
+
+    try:
+        run_translate(infer_args, interactive=False)
+        assert False, "expected ValueError"
+    except ValueError as exc:
+        assert "Attention-Mismatch" in str(exc)

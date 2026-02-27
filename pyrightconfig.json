@@ -1,0 +1,13 @@
+{
+  "include": ["translator", "tests"],
+  "exclude": [
+    "**/__pycache__",
+    ".pytest_tmp",
+    "checkpoints",
+    "pytest-cache-files-*"
+  ],
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "none",
+  "reportMissingTypeStubs": "none",
+  "pythonVersion": "3.13"
+}

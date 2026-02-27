@@ -1,0 +1,133 @@
+import math
+from typing import Callable, Protocol, cast, runtime_checkable
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+@runtime_checkable
+class AttentionProtocol(Protocol):
+    def __call__(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attn_mask: torch.Tensor | None = None,
+        key_padding_mask: torch.Tensor | None = None,
+        need_weights: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        ...
+
+    def forward(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attn_mask: torch.Tensor | None = None,
+        key_padding_mask: torch.Tensor | None = None,
+        need_weights: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        ...
+
+
+AttentionFactory = Callable[[int, int, float], nn.Module]
+
+
+class SimpleMultiheadSDPAttention(nn.Module):
+    def __init__(self, embed_dim: int, num_heads: int, dropout: float, batch_first: bool = True):
+        super().__init__()
+        if not batch_first:
+            raise ValueError("SimpleMultiheadSDPAttention currently supports only batch_first=True")
+        if embed_dim % num_heads != 0:
+            raise ValueError("embed_dim must be divisible by num_heads")
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim)
+        self.k_proj = nn.Linear(embed_dim, embed_dim)
+        self.v_proj = nn.Linear(embed_dim, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+        self.attn_dropout = nn.Dropout(dropout)
+
+    def _split_heads(self, x: torch.Tensor) -> torch.Tensor:
+        bsz, seq_len, _ = x.shape
+        return x.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+
+    def _merge_heads(self, x: torch.Tensor) -> torch.Tensor:
+        bsz, _, seq_len, _ = x.shape
+        return x.transpose(1, 2).contiguous().view(bsz, seq_len, self.embed_dim)
+
+    def forward(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attn_mask: torch.Tensor | None = None,
+        key_padding_mask: torch.Tensor | None = None,
+        need_weights: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        q = self._split_heads(self.q_proj(query))
+        k = self._split_heads(self.k_proj(key))
+        v = self._split_heads(self.v_proj(value))
+
+        scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)
+
+        if attn_mask is not None:
+            if attn_mask.dtype == torch.bool:
+                if attn_mask.dim() == 2:
+                    scores = scores.masked_fill(attn_mask.unsqueeze(0).unsqueeze(0), float("-inf"))
+                elif attn_mask.dim() == 3:
+                    scores = scores.masked_fill(attn_mask.unsqueeze(1), float("-inf"))
+                else:
+                    raise ValueError("attn_mask with bool dtype must have shape [Lq, Lk] or [B, Lq, Lk]")
+            else:
+                if attn_mask.dim() == 2:
+                    scores = scores + attn_mask.unsqueeze(0).unsqueeze(0)
+                elif attn_mask.dim() == 3:
+                    scores = scores + attn_mask.unsqueeze(1)
+                else:
+                    raise ValueError("attn_mask must have shape [Lq, Lk] or [B, Lq, Lk]")
+
+        if key_padding_mask is not None:
+            scores = scores.masked_fill(key_padding_mask.unsqueeze(1).unsqueeze(2), float("-inf"))
+
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.attn_dropout(attn_weights)
+        attn_out = torch.matmul(attn_weights, v)
+        out = self.out_proj(self._merge_heads(attn_out))
+
+        if need_weights:
+            return out, attn_weights.mean(dim=1)
+        return out, None
+
+
+def make_torch_attention_factory() -> AttentionFactory:
+    return lambda d_model, num_heads, dropout: nn.MultiheadAttention(
+        embed_dim=d_model,
+        num_heads=num_heads,
+        dropout=dropout,
+        batch_first=True,
+    )
+
+
+def make_simple_sdp_attention_factory() -> AttentionFactory:
+    return lambda d_model, num_heads, dropout: SimpleMultiheadSDPAttention(
+        embed_dim=d_model,
+        num_heads=num_heads,
+        dropout=dropout,
+        batch_first=True,
+    )
+
+
+def build_attention(
+    attention_factory: AttentionFactory, d_model: int, num_heads: int, dropout: float
+) -> AttentionProtocol:
+    attn = attention_factory(d_model, num_heads, dropout)
+    if not isinstance(attn, nn.Module):
+        raise TypeError("attention_factory must return an nn.Module")
+    if not isinstance(attn, AttentionProtocol):
+        raise TypeError("attention module does not match AttentionProtocol")
+    return cast(AttentionProtocol, attn)

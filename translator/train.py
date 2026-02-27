@@ -1,13 +1,25 @@
 import argparse
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
+from .attention import AttentionFactory, make_simple_sdp_attention_factory, make_torch_attention_factory
 from .data import Tokenizer, TranslationDataset, collate_fn, set_seed, tiny_parallel_corpus
 from .model import Seq2Seq
+
+
+ATTENTION_CHOICES = ("torch", "simple_sdp")
+
+
+def resolve_attention_factory(attention: str) -> AttentionFactory:
+    if attention == "torch":
+        return make_torch_attention_factory()
+    if attention == "simple_sdp":
+        return make_simple_sdp_attention_factory()
+    raise ValueError(f"Unbekannte Attention: {attention!r}. Erlaubt: {ATTENTION_CHOICES}.")
 
 
 def build_model(
@@ -15,7 +27,10 @@ def build_model(
     src_tokenizer: Tokenizer,
     tgt_tokenizer: Tokenizer,
     device: torch.device,
+    attention_factory: AttentionFactory | None = None,
 ) -> Seq2Seq:
+    if attention_factory is None:
+        attention_factory = resolve_attention_factory(getattr(args, "attention", "torch"))
     model = Seq2Seq(
         src_vocab_size=src_tokenizer.vocab_size,
         tgt_vocab_size=tgt_tokenizer.vocab_size,
@@ -27,6 +42,7 @@ def build_model(
         tgt_pad_idx=tgt_tokenizer.pad_token_id,
         tgt_sos_idx=tgt_tokenizer.sos_token_id,
         dropout=args.dropout,
+        attention_factory=attention_factory,
     ).to(device)
     return model
 
@@ -50,6 +66,7 @@ def save_checkpoint(
             "num_heads": args.num_heads,
             "num_layers": args.num_layers,
             "dropout": args.dropout,
+            "attention": getattr(args, "attention", "torch"),
         },
     }
     torch.save(payload, path)
@@ -92,7 +109,13 @@ def train(args: argparse.Namespace) -> None:
 
     loader = create_data_loader(pairs, src_tokenizer, tgt_tokenizer)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = build_model(args, src_tokenizer, tgt_tokenizer, device)
+    model = build_model(
+        args,
+        src_tokenizer,
+        tgt_tokenizer,
+        device,
+        attention_factory=resolve_attention_factory(args.attention),
+    )
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_tokenizer.pad_token_id)
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
     model.train()
@@ -128,9 +151,27 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
 
     src_data = ckpt.get("src_tokenizer", ckpt.get("src_vocab"))
     tgt_data = ckpt.get("tgt_tokenizer", ckpt.get("tgt_vocab"))
-    src_tokenizer = Tokenizer(**src_data)
-    tgt_tokenizer = Tokenizer(**tgt_data)
+    if not isinstance(src_data, dict) or not isinstance(tgt_data, dict):
+        raise ValueError("Checkpoint enthaelt keine gueltigen Tokenizer-Daten.")
+
+    src_stoi = cast(dict[str, int], src_data.get("stoi"))
+    src_itos = cast(list[str], src_data.get("itos"))
+    tgt_stoi = cast(dict[str, int], tgt_data.get("stoi"))
+    tgt_itos = cast(list[str], tgt_data.get("itos"))
+    if src_stoi is None or src_itos is None or tgt_stoi is None or tgt_itos is None:
+        raise ValueError("Checkpoint enthaelt unvollstaendige Tokenizer-Daten.")
+
+    src_tokenizer = Tokenizer(stoi=src_stoi, itos=src_itos)
+    tgt_tokenizer = Tokenizer(stoi=tgt_stoi, itos=tgt_itos)
     hparams = ckpt["hparams"]
+
+    trained_attention = hparams.get("attention", "torch")
+    requested_attention = getattr(args, "attention", "torch")
+    if requested_attention != trained_attention:
+        raise ValueError(
+            f"Attention-Mismatch: Checkpoint nutzt '{trained_attention}', "
+            f"CLI fordert '{requested_attention}'."
+        )
 
     model_args = argparse.Namespace(
         emb_dim=hparams["emb_dim"],
@@ -139,7 +180,13 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
         num_layers=hparams.get("num_layers", 2),
         dropout=hparams.get("dropout", 0.1),
     )
-    model = build_model(model_args, src_tokenizer, tgt_tokenizer, device)
+    model = build_model(
+        model_args,
+        src_tokenizer,
+        tgt_tokenizer,
+        device,
+        attention_factory=resolve_attention_factory(requested_attention),
+    )
     try:
         model.load_state_dict(ckpt["model_state_dict"])
     except RuntimeError as exc:
@@ -186,6 +233,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--checkpoint-path", type=str, default="checkpoints/translator.pt")
+    p.add_argument("--attention", type=str, choices=ATTENTION_CHOICES, default="torch")
     p.add_argument("--translate", type=str, default=None)
     p.add_argument("--interactive", action="store_true")
     p.add_argument("--max-len", type=int, default=30)

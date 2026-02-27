@@ -4,6 +4,8 @@ from typing import List
 import torch
 import torch.nn as nn
 
+from .attention import AttentionFactory, build_attention, make_torch_attention_factory
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, max_len: int = 1024):
@@ -14,6 +16,7 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros(max_len, d_model)
         pe[:, 0::2] = torch.sin(pos * div)
         pe[:, 1::2] = torch.cos(pos * div)
+        self.pe: torch.Tensor
         self.register_buffer("pe", pe.unsqueeze(0))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -21,15 +24,12 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerEncoderBlock(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, ff_dim: int, dropout: float):
+    def __init__(
+        self, d_model: int, num_heads: int, ff_dim: int, dropout: float, attention_factory: AttentionFactory
+    ):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
-        self.self_attn = nn.MultiheadAttention(
-            embed_dim=d_model,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
+        self.self_attn = build_attention(attention_factory, d_model, num_heads, dropout)
         self.drop1 = nn.Dropout(dropout)
 
         self.norm2 = nn.LayerNorm(d_model)
@@ -58,24 +58,16 @@ class TransformerEncoderBlock(nn.Module):
 
 
 class TransformerDecoderBlock(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, ff_dim: int, dropout: float):
+    def __init__(
+        self, d_model: int, num_heads: int, ff_dim: int, dropout: float, attention_factory: AttentionFactory
+    ):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
-        self.self_attn = nn.MultiheadAttention(
-            embed_dim=d_model,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
+        self.self_attn = build_attention(attention_factory, d_model, num_heads, dropout)
         self.drop1 = nn.Dropout(dropout)
 
         self.norm2 = nn.LayerNorm(d_model)
-        self.cross_attn = nn.MultiheadAttention(
-            embed_dim=d_model,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
+        self.cross_attn = build_attention(attention_factory, d_model, num_heads, dropout)
         self.drop2 = nn.Dropout(dropout)
 
         self.norm3 = nn.LayerNorm(d_model)
@@ -135,6 +127,7 @@ class Seq2Seq(nn.Module):
         tgt_sos_idx: int,
         dropout: float = 0.1,
         max_len: int = 1024,
+        attention_factory: AttentionFactory | None = None,
     ):
         super().__init__()
         if d_model % num_heads != 0:
@@ -150,6 +143,9 @@ class Seq2Seq(nn.Module):
         self.pos_enc = PositionalEncoding(d_model, max_len=max_len)
         self.embed_dropout = nn.Dropout(dropout)
 
+        if attention_factory is None:
+            attention_factory = make_torch_attention_factory()
+
         self.encoder_layers = nn.ModuleList(
             [
                 TransformerEncoderBlock(
@@ -157,6 +153,7 @@ class Seq2Seq(nn.Module):
                     num_heads=num_heads,
                     ff_dim=ff_dim,
                     dropout=dropout,
+                    attention_factory=attention_factory,
                 )
                 for _ in range(num_layers)
             ]
@@ -168,6 +165,7 @@ class Seq2Seq(nn.Module):
                     num_heads=num_heads,
                     ff_dim=ff_dim,
                     dropout=dropout,
+                    attention_factory=attention_factory,
                 )
                 for _ in range(num_layers)
             ]

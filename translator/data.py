@@ -58,8 +58,8 @@ class Tokenizer:
         texts: Union[str, List[str]],
         padding: Union[bool, str] = False,
         truncation: bool = False,
-        max_length: int = None,
-        return_tensors: str = None,
+        max_length: int | None = None,
+        return_tensors: str | None = None,
         add_special_tokens: bool = True,
     ) -> Dict[str, Union[List[List[int]], torch.Tensor]]:
         if isinstance(texts, str):

@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+python tools/git_quality_gate.py pre-push

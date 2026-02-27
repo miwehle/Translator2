@@ -21,6 +21,7 @@ def make_args() -> argparse.Namespace:
         num_heads=4,
         num_layers=1,
         dropout=0.0,
+        attention="torch",
         lr=1e-3,
         batch_size=4,
         seed=42,
