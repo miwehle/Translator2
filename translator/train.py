@@ -148,8 +148,8 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = load_checkpoint(args.checkpoint_path, device)
 
-    src_data = ckpt.get("src_tokenizer", ckpt.get("src_vocab"))
-    tgt_data = ckpt.get("tgt_tokenizer", ckpt.get("tgt_vocab"))
+    src_data = ckpt.get("src_tokenizer")
+    tgt_data = ckpt.get("tgt_tokenizer")
     if not isinstance(src_data, dict) or not isinstance(tgt_data, dict):
         raise ValueError("Checkpoint enthaelt keine gueltigen Tokenizer-Daten.")
 

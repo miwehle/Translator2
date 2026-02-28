@@ -94,10 +94,6 @@ class Tokenizer:
         return len(self.itos)
 
     @property
-    def size(self) -> int:
-        return self.vocab_size
-
-    @property
     def pad_token_id(self) -> int:
         return self.stoi[PAD]
 
