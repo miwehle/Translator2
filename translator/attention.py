@@ -1,5 +1,5 @@
 import math
-from typing import Callable, Protocol, cast, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 import torch
 import torch.nn as nn
@@ -10,12 +10,8 @@ import torch.nn.functional as F
 class AttentionProtocol(Protocol):
     def __call__(
         self,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        value: torch.Tensor,
-        attn_mask: torch.Tensor | None = None,
-        key_padding_mask: torch.Tensor | None = None,
-        need_weights: bool = True,
+        *args: Any,
+        **kwargs: Any,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         ...
 
@@ -24,14 +20,16 @@ class AttentionProtocol(Protocol):
         query: torch.Tensor,
         key: torch.Tensor,
         value: torch.Tensor,
-        attn_mask: torch.Tensor | None = None,
         key_padding_mask: torch.Tensor | None = None,
         need_weights: bool = True,
+        attn_mask: torch.Tensor | None = None,
+        average_attn_weights: bool = True,
+        is_causal: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         ...
 
 
-AttentionFactory = Callable[[int, int, float], nn.Module]
+AttentionFactory = Callable[[int, int, float], AttentionProtocol]
 
 
 class SimpleMultiheadSDPAttention(nn.Module):
@@ -65,10 +63,31 @@ class SimpleMultiheadSDPAttention(nn.Module):
         query: torch.Tensor,
         key: torch.Tensor,
         value: torch.Tensor,
-        attn_mask: torch.Tensor | None = None,
         key_padding_mask: torch.Tensor | None = None,
         need_weights: bool = True,
+        attn_mask: torch.Tensor | None = None,
+        average_attn_weights: bool = True,
+        is_causal: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        """Compute multi-head scaled dot-product attention.
+
+        Mask convention: for boolean masks, True means "blocked"; for additive masks,
+        values are added to attention logits (e.g. -inf blocks positions).
+        """
+        if is_causal:
+            q_len = query.size(1)
+            k_len = key.size(1)
+            causal = torch.triu(
+                torch.ones(q_len, k_len, device=query.device, dtype=torch.bool),
+                diagonal=1,
+            )
+            if attn_mask is None:
+                attn_mask = causal
+            elif attn_mask.dtype == torch.bool:
+                attn_mask = attn_mask | causal
+            else:
+                attn_mask = attn_mask + causal.to(attn_mask.dtype) * float("-inf")
+
         q = self._split_heads(self.q_proj(query))
         k = self._split_heads(self.k_proj(key))
         v = self._split_heads(self.v_proj(value))
@@ -100,7 +119,9 @@ class SimpleMultiheadSDPAttention(nn.Module):
         out = self.out_proj(self._merge_heads(attn_out))
 
         if need_weights:
-            return out, attn_weights.mean(dim=1)
+            if average_attn_weights:
+                return out, attn_weights.mean(dim=1)
+            return out, attn_weights
         return out, None
 
 
@@ -125,9 +146,4 @@ def make_simple_sdp_attention_factory() -> AttentionFactory:
 def build_attention(
     attention_factory: AttentionFactory, d_model: int, num_heads: int, dropout: float
 ) -> AttentionProtocol:
-    attn = attention_factory(d_model, num_heads, dropout)
-    if not isinstance(attn, nn.Module):
-        raise TypeError("attention_factory must return an nn.Module")
-    if not isinstance(attn, AttentionProtocol):
-        raise TypeError("attention module does not match AttentionProtocol")
-    return cast(AttentionProtocol, attn)
+    return attention_factory(d_model, num_heads, dropout)

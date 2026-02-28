@@ -24,6 +24,8 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerEncoderBlock(nn.Module):
+    """Transformer encoder block using Pre-Norm (LayerNorm before each sub-layer)."""
+
     def __init__(
         self, d_model: int, num_heads: int, ff_dim: int, dropout: float, attention_factory: AttentionFactory
     ):
@@ -58,6 +60,8 @@ class TransformerEncoderBlock(nn.Module):
 
 
 class TransformerDecoderBlock(nn.Module):
+    """Transformer decoder block using Pre-Norm (LayerNorm before each sub-layer)."""
+
     def __init__(
         self, d_model: int, num_heads: int, ff_dim: int, dropout: float, attention_factory: AttentionFactory
     ):
@@ -206,6 +210,7 @@ class Seq2Seq(nn.Module):
 
     def forward(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
         memory, src_key_padding_mask = self.encode(src)
+        # Teacher forcing input: decoder sees target tokens up to t-1 to predict token t.
         tgt_in = tgt[:, :-1]
         return self.decode(tgt_in, memory, src_key_padding_mask)
 
@@ -213,6 +218,7 @@ class Seq2Seq(nn.Module):
     def translate(
         self, src_ids: List[int], max_len: int, device: torch.device, eos_idx: int
     ) -> List[int]:
+        """Simple inference: greedy argmax decoding only (no beam search or sampling)."""
         src = torch.tensor([src_ids], dtype=torch.long, device=device)
         memory, src_key_padding_mask = self.encode(src)
 

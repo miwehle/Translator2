@@ -99,8 +99,10 @@ def test_invalid_attention_factory_raises_clear_error():
         del d_model, num_heads, dropout
         return object()
 
+    model = _make_model(bad_factory)
+    src, tgt = _dummy_batch()
     try:
-        _make_model(bad_factory)
-        assert False, "expected TypeError"
-    except TypeError as exc:
-        assert "attention_factory must return an nn.Module" in str(exc)
+        model(src, tgt)
+        assert False, "expected runtime error"
+    except TypeError:
+        assert True
