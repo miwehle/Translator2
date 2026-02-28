@@ -14,7 +14,7 @@ from .model import Seq2Seq
 ATTENTION_CHOICES = ("torch", "simple_sdp")
 
 
-def resolve_attention_factory(attention: str) -> AttentionFactory:
+def make_attention_factory(attention: str) -> AttentionFactory:
     if attention == "torch":
         return make_torch_attention_factory()
     if attention == "simple_sdp":
@@ -30,7 +30,7 @@ def build_model(
     attention_factory: AttentionFactory | None = None,
 ) -> Seq2Seq:
     if attention_factory is None:
-        attention_factory = resolve_attention_factory(getattr(args, "attention", "torch"))
+        attention_factory = make_attention_factory(getattr(args, "attention", "torch"))
     model = Seq2Seq(
         src_vocab_size=src_tokenizer.vocab_size,
         tgt_vocab_size=tgt_tokenizer.vocab_size,
@@ -114,7 +114,7 @@ def train(args: argparse.Namespace) -> None:
         src_tokenizer,
         tgt_tokenizer,
         device,
-        attention_factory=resolve_attention_factory(args.attention),
+        attention_factory=make_attention_factory(args.attention),
     )
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_tokenizer.pad_token_id)
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -184,7 +184,7 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
         src_tokenizer,
         tgt_tokenizer,
         device,
-        attention_factory=resolve_attention_factory(requested_attention),
+        attention_factory=make_attention_factory(requested_attention),
     )
     try:
         model.load_state_dict(ckpt["model_state_dict"])
