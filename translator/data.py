@@ -127,12 +127,9 @@ class TranslationDataset(Dataset):
 
 def collate_fn(
     batch: List[Tuple[List[int], List[int]]], pad_idx_src: int, pad_idx_tgt: int
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    src_lens = torch.tensor([len(src) for src, _ in batch], dtype=torch.long)
-    tgt_lens = torch.tensor([len(tgt) for _, tgt in batch], dtype=torch.long)
-
-    max_src = int(src_lens.max().item())
-    max_tgt = int(tgt_lens.max().item())
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    max_src = max(len(src) for src, _ in batch)
+    max_tgt = max(len(tgt) for _, tgt in batch)
     bsz = len(batch)
 
     src_batch = torch.full((bsz, max_src), pad_idx_src, dtype=torch.long)
@@ -141,7 +138,7 @@ def collate_fn(
     for i, (src, tgt) in enumerate(batch):
         src_batch[i, : len(src)] = torch.tensor(src, dtype=torch.long)
         tgt_batch[i, : len(tgt)] = torch.tensor(tgt, dtype=torch.long)
-    return src_batch, src_lens, tgt_batch, tgt_lens
+    return src_batch, tgt_batch
 
 
 def tiny_parallel_corpus() -> List[Tuple[str, str]]:

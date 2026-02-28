@@ -54,11 +54,10 @@ def build_training_objects():
 
 
 def batch_loss(model, criterion, batch, device):
-    src, src_lens, tgt, _ = batch
+    src, tgt = batch
     src = src.to(device)
-    src_lens = src_lens.to(device)
     tgt = tgt.to(device)
-    logits = model(src, src_lens, tgt)
+    logits = model(src, tgt)
     return criterion(logits.reshape(-1, logits.size(-1)), tgt[:, 1:].reshape(-1))
 
 

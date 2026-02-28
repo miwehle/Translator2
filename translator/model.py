@@ -204,10 +204,7 @@ class Seq2Seq(nn.Module):
         x = self.dec_final_norm(x)
         return self.out_proj(x)
 
-    def forward(
-        self, src: torch.Tensor, src_lens: torch.Tensor, tgt: torch.Tensor, teacher_forcing: float = 1.0
-    ) -> torch.Tensor:
-        del src_lens, teacher_forcing
+    def forward(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
         memory, src_key_padding_mask = self.encode(src)
         tgt_in = tgt[:, :-1]
         return self.decode(tgt_in, memory, src_key_padding_mask)

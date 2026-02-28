@@ -122,13 +122,12 @@ def train(args: argparse.Namespace) -> None:
 
     for epoch in range(1, args.epochs + 1):
         total_loss = 0.0
-        for src, src_lens, tgt, _ in loader:
+        for src, tgt in loader:
             src = src.to(device)
-            src_lens = src_lens.to(device)
             tgt = tgt.to(device)
 
             optim.zero_grad()
-            logits = model(src, src_lens, tgt)
+            logits = model(src, tgt)
             loss = criterion(
                 logits.reshape(-1, logits.size(-1)),
                 tgt[:, 1:].reshape(-1),

@@ -24,8 +24,7 @@ def _dummy_batch(batch_size: int = 2, src_len: int = 5, tgt_len: int = 6):
         ],
         dtype=torch.long,
     )[:batch_size, :tgt_len]
-    src_lens = torch.tensor([3, 4], dtype=torch.long)[:batch_size]
-    return src, src_lens, tgt
+    return src, tgt
 
 
 def _make_model(attention_factory):
@@ -54,15 +53,15 @@ def test_attention_factories_return_protocol_compatible_modules():
 
 def test_seq2seq_forward_works_with_torch_attention_factory():
     model = _make_model(make_torch_attention_factory())
-    src, src_lens, tgt = _dummy_batch()
-    logits = model(src, src_lens, tgt)
+    src, tgt = _dummy_batch()
+    logits = model(src, tgt)
     assert logits.shape == (src.size(0), tgt.size(1) - 1, 40)
 
 
 def test_seq2seq_forward_works_with_simple_sdp_attention_factory():
     model = _make_model(make_simple_sdp_attention_factory())
-    src, src_lens, tgt = _dummy_batch()
-    logits = model(src, src_lens, tgt)
+    src, tgt = _dummy_batch()
+    logits = model(src, tgt)
     assert logits.shape == (src.size(0), tgt.size(1) - 1, 40)
 
 
