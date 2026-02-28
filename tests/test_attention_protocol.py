@@ -2,9 +2,8 @@ import torch
 import torch.nn as nn
 
 from translator.attention import (
+    make_attention_factory,
     AttentionProtocol,
-    make_simple_sdp_attention_factory,
-    make_torch_attention_factory,
 )
 from translator.model import Seq2Seq
 
@@ -45,28 +44,28 @@ def _make_model(attention_factory):
 
 
 def test_attention_factories_return_protocol_compatible_modules():
-    for factory in (make_torch_attention_factory(), make_simple_sdp_attention_factory()):
+    for factory in (make_attention_factory("torch"), make_attention_factory("simple_sdp")):
         attn = factory(16, 4, 0.0)
         assert isinstance(attn, nn.Module)
         assert isinstance(attn, AttentionProtocol)
 
 
 def test_seq2seq_forward_works_with_torch_attention_factory():
-    model = _make_model(make_torch_attention_factory())
+    model = _make_model(make_attention_factory("torch"))
     src, tgt = _dummy_batch()
     logits = model(src, tgt)
     assert logits.shape == (src.size(0), tgt.size(1) - 1, 40)
 
 
 def test_seq2seq_forward_works_with_simple_sdp_attention_factory():
-    model = _make_model(make_simple_sdp_attention_factory())
+    model = _make_model(make_attention_factory("simple_sdp"))
     src, tgt = _dummy_batch()
     logits = model(src, tgt)
     assert logits.shape == (src.size(0), tgt.size(1) - 1, 40)
 
 
 def test_simple_sdp_attention_applies_masks_and_returns_expected_shapes():
-    attn = make_simple_sdp_attention_factory()(16, 4, 0.0)
+    attn = make_attention_factory("simple_sdp")(16, 4, 0.0)
 
     query = torch.randn(2, 4, 16)
     key = torch.randn(2, 5, 16)

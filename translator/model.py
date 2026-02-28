@@ -4,7 +4,7 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from .attention import AttentionFactory, build_attention, make_torch_attention_factory
+from .attention import AttentionFactory, build_attention, make_attention_factory
 
 
 class PositionalEncoding(nn.Module):
@@ -148,7 +148,7 @@ class Seq2Seq(nn.Module):
         self.embed_dropout = nn.Dropout(dropout)
 
         if attention_factory is None:
-            attention_factory = make_torch_attention_factory()
+            attention_factory = make_attention_factory("torch")
 
         self.encoder_layers = nn.ModuleList(
             [

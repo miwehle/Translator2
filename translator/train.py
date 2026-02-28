@@ -6,20 +6,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from .attention import AttentionFactory, make_simple_sdp_attention_factory, make_torch_attention_factory
+from .attention import ATTENTION_CHOICES, AttentionFactory, make_attention_factory
 from .data import Tokenizer, TranslationDataset, collate_fn, set_seed, tiny_parallel_corpus
 from .model import Seq2Seq
-
-
-ATTENTION_CHOICES = ("torch", "simple_sdp")
-
-
-def make_attention_factory(attention: str) -> AttentionFactory:
-    if attention == "torch":
-        return make_torch_attention_factory()
-    if attention == "simple_sdp":
-        return make_simple_sdp_attention_factory()
-    raise ValueError(f"Unbekannte Attention: {attention!r}. Erlaubt: {ATTENTION_CHOICES}.")
 
 
 def build_model(
@@ -220,26 +209,25 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
     print(translate_text(args.translate))
 
 
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Minimaler Transformer-Translator (Pre-Norm)")
-    p.add_argument("--epochs", type=int, default=200)
-    p.add_argument("--batch-size", type=int, default=4)
-    p.add_argument("--emb-dim", type=int, default=64)
-    p.add_argument("--hidden-dim", type=int, default=64)
-    p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--num-heads", type=int, default=4)
-    p.add_argument("--num-layers", type=int, default=2)
-    p.add_argument("--dropout", type=float, default=0.1)
-    p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--checkpoint-path", type=str, default="checkpoints/translator.pt")
-    p.add_argument("--attention", type=str, choices=ATTENTION_CHOICES, default="torch")
-    p.add_argument("--translate", type=str, default=None)
-    p.add_argument("--interactive", action="store_true")
-    p.add_argument("--max-len", type=int, default=30)
-    return p.parse_args()
-
-
 def main() -> None:
+    def parse_args() -> argparse.Namespace:
+        p = argparse.ArgumentParser(description="Minimaler Transformer-Translator (Pre-Norm)")
+        p.add_argument("--epochs", type=int, default=200)
+        p.add_argument("--batch-size", type=int, default=4)
+        p.add_argument("--emb-dim", type=int, default=64)
+        p.add_argument("--hidden-dim", type=int, default=64)
+        p.add_argument("--lr", type=float, default=1e-3)
+        p.add_argument("--num-heads", type=int, default=4)
+        p.add_argument("--num-layers", type=int, default=2)
+        p.add_argument("--dropout", type=float, default=0.1)
+        p.add_argument("--seed", type=int, default=42)
+        p.add_argument("--checkpoint-path", type=str, default="checkpoints/translator.pt")
+        p.add_argument("--attention", type=str, choices=ATTENTION_CHOICES, default="torch")
+        p.add_argument("--translate", type=str, default=None)
+        p.add_argument("--interactive", action="store_true")
+        p.add_argument("--max-len", type=int, default=30)
+        return p.parse_args()
+
     args = parse_args()
     if args.translate and args.interactive:
         raise ValueError("Nutze entweder --translate oder --interactive, nicht beides.")

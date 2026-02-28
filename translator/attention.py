@@ -32,6 +32,7 @@ class AttentionProtocol(Protocol):
 
 
 AttentionFactory = Callable[[int, int, float], AttentionProtocol]
+ATTENTION_CHOICES = ("torch", "simple_sdp")
 
 
 class SimpleMultiheadSDPAttention(nn.Module):
@@ -125,24 +126,28 @@ class SimpleMultiheadSDPAttention(nn.Module):
                 return out, attn_weights.mean(dim=1)
             return out, attn_weights
         return out, None
+def make_attention_factory(attention: str) -> AttentionFactory:
+    def make_torch_attention_factory() -> AttentionFactory:
+        return lambda d_model, num_heads, dropout: nn.MultiheadAttention(
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+        )
 
+    def make_simple_sdp_attention_factory() -> AttentionFactory:
+        return lambda d_model, num_heads, dropout: SimpleMultiheadSDPAttention(
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+        )
 
-def make_torch_attention_factory() -> AttentionFactory:
-    return lambda d_model, num_heads, dropout: nn.MultiheadAttention(
-        embed_dim=d_model,
-        num_heads=num_heads,
-        dropout=dropout,
-        batch_first=True,
-    )
-
-
-def make_simple_sdp_attention_factory() -> AttentionFactory:
-    return lambda d_model, num_heads, dropout: SimpleMultiheadSDPAttention(
-        embed_dim=d_model,
-        num_heads=num_heads,
-        dropout=dropout,
-        batch_first=True,
-    )
+    if attention == "torch":
+        return make_torch_attention_factory()
+    if attention == "simple_sdp":
+        return make_simple_sdp_attention_factory()
+    raise ValueError(f"Unknown attention={attention!r}. Allowed values: {ATTENTION_CHOICES}.")
 
 
 def build_attention(
