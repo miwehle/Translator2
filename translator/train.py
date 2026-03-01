@@ -89,6 +89,71 @@ def load_checkpoint(path: str, device: torch.device) -> Dict[str, Any]:
     return ckpt
 
 
+def _load_tokenizers_from_checkpoint_payload(ckpt: Dict[str, Any]) -> tuple[TokenizerProtocol, TokenizerProtocol]:
+    src_data = ckpt.get("src_tokenizer")
+    tgt_data = ckpt.get("tgt_tokenizer")
+    if not isinstance(src_data, dict) or not isinstance(tgt_data, dict):
+        raise ValueError("Checkpoint enthaelt keine gueltigen Tokenizer-Daten.")
+    return deserialize_tokenizer(src_data), deserialize_tokenizer(tgt_data)
+
+
+def _load_model_from_checkpoint_payload(
+    ckpt: Dict[str, Any],
+    src_tokenizer: TokenizerProtocol,
+    tgt_tokenizer: TokenizerProtocol,
+    device: torch.device,
+    args: argparse.Namespace,
+) -> Seq2Seq:
+    hparams = ckpt["hparams"]
+    trained_attention = hparams.get("attention", "torch")
+    requested_attention = getattr(args, "attention", "torch")
+    if requested_attention != trained_attention:
+        raise ValueError(
+            f"Attention-Mismatch: Checkpoint nutzt '{trained_attention}', "
+            f"CLI fordert '{requested_attention}'."
+        )
+    trained_tokenizer = hparams.get("tokenizer", "custom")
+    requested_tokenizer = getattr(args, "tokenizer", "custom")
+    if requested_tokenizer != trained_tokenizer:
+        raise ValueError(
+            f"Tokenizer-Mismatch: Checkpoint nutzt '{trained_tokenizer}', "
+            f"CLI fordert '{requested_tokenizer}'."
+        )
+
+    model_args = argparse.Namespace(
+        emb_dim=hparams["emb_dim"],
+        hidden_dim=hparams["hidden_dim"],
+        num_heads=hparams["num_heads"],
+        num_layers=hparams.get("num_layers", 2),
+        dropout=hparams.get("dropout", 0.1),
+    )
+    model = build_model(
+        model_args,
+        src_tokenizer,
+        tgt_tokenizer,
+        device,
+        attention_factory=make_attention_factory(requested_attention),
+    )
+    try:
+        model.load_state_dict(ckpt["model_state_dict"])
+    except RuntimeError as exc:
+        raise RuntimeError(
+            "Checkpoint passt nicht zur aktuellen Modellarchitektur. "
+            "Bitte mit der aktuellen Transformer-Version neu trainieren."
+        ) from exc
+    model.eval()
+    return model
+
+
+def load_inference_components(
+    path: str, device: torch.device, args: argparse.Namespace
+) -> tuple[Seq2Seq, TokenizerProtocol, TokenizerProtocol]:
+    ckpt = load_checkpoint(path, device)
+    src_tokenizer, tgt_tokenizer = _load_tokenizers_from_checkpoint_payload(ckpt)
+    model = _load_model_from_checkpoint_payload(ckpt, src_tokenizer, tgt_tokenizer, device, args)
+    return model, src_tokenizer, tgt_tokenizer
+
+
 def train(args: argparse.Namespace) -> None:
     set_seed(args.seed)
 
@@ -164,60 +229,8 @@ def train(args: argparse.Namespace) -> None:
 
 
 def run_translate(args: argparse.Namespace, interactive: bool) -> None:
-    def load_tokenizers_from_checkpoint(ckpt: Dict[str, Any]) -> tuple[TokenizerProtocol, TokenizerProtocol]:
-        src_data = ckpt.get("src_tokenizer")
-        tgt_data = ckpt.get("tgt_tokenizer")
-        if not isinstance(src_data, dict) or not isinstance(tgt_data, dict):
-            raise ValueError("Checkpoint enthaelt keine gueltigen Tokenizer-Daten.")
-        return deserialize_tokenizer(src_data), deserialize_tokenizer(tgt_data)
-
-    def load_model_from_checkpoint(
-        ckpt: Dict[str, Any], src_tokenizer: TokenizerProtocol, tgt_tokenizer: TokenizerProtocol, device: torch.device
-    ) -> Seq2Seq:
-        hparams = ckpt["hparams"]
-        trained_attention = hparams.get("attention", "torch")
-        requested_attention = getattr(args, "attention", "torch")
-        if requested_attention != trained_attention:
-            raise ValueError(
-                f"Attention-Mismatch: Checkpoint nutzt '{trained_attention}', "
-                f"CLI fordert '{requested_attention}'."
-            )
-        trained_tokenizer = hparams.get("tokenizer", "custom")
-        requested_tokenizer = getattr(args, "tokenizer", "custom")
-        if requested_tokenizer != trained_tokenizer:
-            raise ValueError(
-                f"Tokenizer-Mismatch: Checkpoint nutzt '{trained_tokenizer}', "
-                f"CLI fordert '{requested_tokenizer}'."
-            )
-
-        model_args = argparse.Namespace(
-            emb_dim=hparams["emb_dim"],
-            hidden_dim=hparams["hidden_dim"],
-            num_heads=hparams["num_heads"],
-            num_layers=hparams.get("num_layers", 2),
-            dropout=hparams.get("dropout", 0.1),
-        )
-        model = build_model(
-            model_args,
-            src_tokenizer,
-            tgt_tokenizer,
-            device,
-            attention_factory=make_attention_factory(requested_attention),
-        )
-        try:
-            model.load_state_dict(ckpt["model_state_dict"])
-        except RuntimeError as exc:
-            raise RuntimeError(
-                "Checkpoint passt nicht zur aktuellen Modellarchitektur. "
-                "Bitte mit der aktuellen Transformer-Version neu trainieren."
-            ) from exc
-        model.eval()
-        return model
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    ckpt = load_checkpoint(args.checkpoint_path, device)
-    src_tokenizer, tgt_tokenizer = load_tokenizers_from_checkpoint(ckpt)
-    model = load_model_from_checkpoint(ckpt, src_tokenizer, tgt_tokenizer, device)
+    model, src_tokenizer, tgt_tokenizer = load_inference_components(args.checkpoint_path, device, args)
     tgt_eos_idx = tgt_tokenizer.eos_token_id
     if tgt_eos_idx is None:
         raise ValueError("Tokenizer hat keinen eos_token_id.")

@@ -8,6 +8,7 @@ from translator.data import Tokenizer, tiny_parallel_corpus
 from translator.model import Seq2Seq
 from translator.train import (
     build_model,
+    load_inference_components,
     load_checkpoint,
     run_translate,
     save_checkpoint,
@@ -138,3 +139,19 @@ def test_run_translate_raises_on_attention_mismatch():
         assert False, "expected ValueError"
     except ValueError as exc:
         assert "Attention-Mismatch" in str(exc)
+
+
+def test_load_inference_components_returns_model_and_tokenizers():
+    src_tokenizer, tgt_tokenizer = make_vocabs()
+    ckpt_path = make_ckpt_path()
+    args = make_args(ckpt_path)
+    model = build_model(args, src_tokenizer, tgt_tokenizer, torch.device("cpu"))
+    save_checkpoint(str(ckpt_path), model, src_tokenizer, tgt_tokenizer, args)
+
+    loaded_model, loaded_src_tokenizer, loaded_tgt_tokenizer = load_inference_components(
+        str(ckpt_path), torch.device("cpu"), args
+    )
+
+    assert isinstance(loaded_model, Seq2Seq)
+    assert isinstance(loaded_src_tokenizer, Tokenizer)
+    assert isinstance(loaded_tgt_tokenizer, Tokenizer)
