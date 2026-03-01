@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from translator.model.attention import (
+from translator.model.factory import (
     make_attention_factory,
     AttentionProtocol,
 )

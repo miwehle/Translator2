@@ -1,12 +1,9 @@
 from .dataset import TranslationDataset, collate_fn, set_seed, tiny_parallel_corpus
+from .factory import TOKENIZER_CHOICES, TokenizerFactory, TokenizerProtocol, make_tokenizer_factory
 from .tokenizer import (
-    TOKENIZER_CHOICES,
     HuggingFaceTokenizerAdapter,
     Tokenizer,
-    TokenizerFactory,
-    TokenizerProtocol,
     deserialize_tokenizer,
-    make_tokenizer_factory,
     serialize_tokenizer,
 )
 

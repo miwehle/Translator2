@@ -6,17 +6,15 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from .checkpointing import load_inference_components, save_checkpoint
-from ..model.attention import ATTENTION_CHOICES, AttentionFactory, make_attention_factory
 from ..data import (
-    TOKENIZER_CHOICES,
-    TokenizerProtocol,
     TranslationDataset,
     collate_fn,
-    make_tokenizer_factory,
     set_seed,
     tiny_parallel_corpus,
 )
+from ..data.factory import TOKENIZER_CHOICES, TokenizerProtocol, make_tokenizer_factory
 from ..model import Seq2Seq
+from ..model.factory import ATTENTION_CHOICES, AttentionFactory, make_attention_factory
 
 
 def build_model(

@@ -4,7 +4,7 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from .attention import AttentionFactory, make_attention_factory
+from .factory import AttentionFactory, make_attention_factory
 from .blocks import DecoderBlock, EncoderBlock
 
 

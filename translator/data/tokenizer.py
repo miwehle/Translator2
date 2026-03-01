@@ -1,51 +1,12 @@
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Dict, List, Protocol, Union, runtime_checkable
+from typing import Any, Dict, List, Union
 
 import torch
 
 from ..constants import EOS, PAD, SOS, UNK
-
-
-@runtime_checkable
-class TokenizerProtocol(Protocol):
-    def encode(self, text: str, add_special_tokens: bool = True) -> List[int]:
-        ...
-
-    def decode(self, ids: List[int], skip_special_tokens: bool = True) -> str:
-        ...
-
-    def __call__(
-        self,
-        texts: Union[str, List[str]],
-        padding: Union[bool, str] = False,
-        truncation: bool = False,
-        max_length: int | None = None,
-        return_tensors: str | None = None,
-        add_special_tokens: bool = True,
-    ) -> Dict[str, Any]:
-        ...
-
-    @property
-    def vocab_size(self) -> int:
-        ...
-
-    @property
-    def pad_token_id(self) -> int | None:
-        ...
-
-    @property
-    def bos_token_id(self) -> int | None:
-        ...
-
-    @property
-    def eos_token_id(self) -> int | None:
-        ...
-
-
-TokenizerFactory = Callable[[List[str]], TokenizerProtocol]
-TOKENIZER_CHOICES = ("custom", "hf")
+from .factory import TokenizerProtocol
 
 
 @dataclass
@@ -249,20 +210,6 @@ class HuggingFaceTokenizerAdapter:
             "tokenizer_name": self._tokenizer_name,
             "files": files,
         }
-
-
-def make_tokenizer_factory(tokenizer: str, hf_tokenizer_name: str) -> TokenizerFactory:
-    def make_custom_tokenizer_factory() -> TokenizerFactory:
-        return lambda sentences: Tokenizer.build(sentences)
-
-    def make_hf_tokenizer_factory() -> TokenizerFactory:
-        return lambda _: HuggingFaceTokenizerAdapter.from_pretrained(hf_tokenizer_name)
-
-    if tokenizer == "custom":
-        return make_custom_tokenizer_factory()
-    if tokenizer == "hf":
-        return make_hf_tokenizer_factory()
-    raise ValueError(f"Unknown tokenizer={tokenizer!r}. Allowed values: {TOKENIZER_CHOICES}.")
 
 
 def serialize_tokenizer(tokenizer: TokenizerProtocol) -> Dict[str, Any]:

@@ -4,9 +4,10 @@ from typing import Any, Callable, Dict
 
 import torch
 
-from ..data import TokenizerProtocol, deserialize_tokenizer, serialize_tokenizer
+from ..data import deserialize_tokenizer, serialize_tokenizer
+from ..data.factory import TokenizerProtocol
 from ..model import Seq2Seq
-from ..model.attention import AttentionFactory, make_attention_factory
+from ..model.factory import AttentionFactory, make_attention_factory
 
 BuildModelFn = Callable[
     [argparse.Namespace, TokenizerProtocol, TokenizerProtocol, torch.device, AttentionFactory | None], Seq2Seq

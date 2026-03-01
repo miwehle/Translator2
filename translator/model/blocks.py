@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from .attention import AttentionFactory, build_attention
+from .factory import AttentionFactory, build_attention
 
 
 class EncoderBlock(nn.Module):
