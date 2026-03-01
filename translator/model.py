@@ -23,7 +23,7 @@ class PositionalEncoding(nn.Module):
         return x + self.pe[:, : x.size(1)]
 
 
-class TransformerEncoderBlock(nn.Module):
+class EncoderBlock(nn.Module):
     """Transformer encoder block using Pre-Norm (LayerNorm before each sub-layer)."""
 
     def __init__(
@@ -59,7 +59,7 @@ class TransformerEncoderBlock(nn.Module):
         return x
 
 
-class TransformerDecoderBlock(nn.Module):
+class DecoderBlock(nn.Module):
     """Transformer decoder block using Pre-Norm (LayerNorm before each sub-layer)."""
 
     def __init__(
@@ -152,7 +152,7 @@ class Seq2Seq(nn.Module):
 
         self.encoder_layers = nn.ModuleList(
             [
-                TransformerEncoderBlock(
+                EncoderBlock(
                     d_model=d_model,
                     num_heads=num_heads,
                     ff_dim=ff_dim,
@@ -164,7 +164,7 @@ class Seq2Seq(nn.Module):
         )
         self.decoder_layers = nn.ModuleList(
             [
-                TransformerDecoderBlock(
+                DecoderBlock(
                     d_model=d_model,
                     num_heads=num_heads,
                     ff_dim=ff_dim,

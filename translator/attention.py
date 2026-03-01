@@ -126,6 +126,8 @@ class SimpleMultiheadSDPAttention(nn.Module):
                 return out, attn_weights.mean(dim=1)
             return out, attn_weights
         return out, None
+
+
 def make_attention_factory(attention: str) -> AttentionFactory:
     def make_torch_attention_factory() -> AttentionFactory:
         return lambda d_model, num_heads, dropout: nn.MultiheadAttention(

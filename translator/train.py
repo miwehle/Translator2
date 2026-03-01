@@ -134,55 +134,61 @@ def train(args: argparse.Namespace) -> None:
 
 
 def run_translate(args: argparse.Namespace, interactive: bool) -> None:
+    def load_tokenizers_from_checkpoint(ckpt: Dict[str, Any]) -> tuple[Tokenizer, Tokenizer]:
+        src_data = ckpt.get("src_tokenizer")
+        tgt_data = ckpt.get("tgt_tokenizer")
+        if not isinstance(src_data, dict) or not isinstance(tgt_data, dict):
+            raise ValueError("Checkpoint enthaelt keine gueltigen Tokenizer-Daten.")
+
+        src_stoi = cast(dict[str, int], src_data.get("stoi"))
+        src_itos = cast(list[str], src_data.get("itos"))
+        tgt_stoi = cast(dict[str, int], tgt_data.get("stoi"))
+        tgt_itos = cast(list[str], tgt_data.get("itos"))
+        if src_stoi is None or src_itos is None or tgt_stoi is None or tgt_itos is None:
+            raise ValueError("Checkpoint enthaelt unvollstaendige Tokenizer-Daten.")
+
+        return Tokenizer(stoi=src_stoi, itos=src_itos), Tokenizer(stoi=tgt_stoi, itos=tgt_itos)
+
+    def load_model_from_checkpoint(
+        ckpt: Dict[str, Any], src_tokenizer: Tokenizer, tgt_tokenizer: Tokenizer, device: torch.device
+    ) -> Seq2Seq:
+        hparams = ckpt["hparams"]
+        trained_attention = hparams.get("attention", "torch")
+        requested_attention = getattr(args, "attention", "torch")
+        if requested_attention != trained_attention:
+            raise ValueError(
+                f"Attention-Mismatch: Checkpoint nutzt '{trained_attention}', "
+                f"CLI fordert '{requested_attention}'."
+            )
+
+        model_args = argparse.Namespace(
+            emb_dim=hparams["emb_dim"],
+            hidden_dim=hparams["hidden_dim"],
+            num_heads=hparams["num_heads"],
+            num_layers=hparams.get("num_layers", 2),
+            dropout=hparams.get("dropout", 0.1),
+        )
+        model = build_model(
+            model_args,
+            src_tokenizer,
+            tgt_tokenizer,
+            device,
+            attention_factory=make_attention_factory(requested_attention),
+        )
+        try:
+            model.load_state_dict(ckpt["model_state_dict"])
+        except RuntimeError as exc:
+            raise RuntimeError(
+                "Checkpoint passt nicht zur aktuellen Modellarchitektur. "
+                "Bitte mit der aktuellen Transformer-Version neu trainieren."
+            ) from exc
+        model.eval()
+        return model
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = load_checkpoint(args.checkpoint_path, device)
-
-    src_data = ckpt.get("src_tokenizer")
-    tgt_data = ckpt.get("tgt_tokenizer")
-    if not isinstance(src_data, dict) or not isinstance(tgt_data, dict):
-        raise ValueError("Checkpoint enthaelt keine gueltigen Tokenizer-Daten.")
-
-    src_stoi = cast(dict[str, int], src_data.get("stoi"))
-    src_itos = cast(list[str], src_data.get("itos"))
-    tgt_stoi = cast(dict[str, int], tgt_data.get("stoi"))
-    tgt_itos = cast(list[str], tgt_data.get("itos"))
-    if src_stoi is None or src_itos is None or tgt_stoi is None or tgt_itos is None:
-        raise ValueError("Checkpoint enthaelt unvollstaendige Tokenizer-Daten.")
-
-    src_tokenizer = Tokenizer(stoi=src_stoi, itos=src_itos)
-    tgt_tokenizer = Tokenizer(stoi=tgt_stoi, itos=tgt_itos)
-    hparams = ckpt["hparams"]
-
-    trained_attention = hparams.get("attention", "torch")
-    requested_attention = getattr(args, "attention", "torch")
-    if requested_attention != trained_attention:
-        raise ValueError(
-            f"Attention-Mismatch: Checkpoint nutzt '{trained_attention}', "
-            f"CLI fordert '{requested_attention}'."
-        )
-
-    model_args = argparse.Namespace(
-        emb_dim=hparams["emb_dim"],
-        hidden_dim=hparams["hidden_dim"],
-        num_heads=hparams["num_heads"],
-        num_layers=hparams.get("num_layers", 2),
-        dropout=hparams.get("dropout", 0.1),
-    )
-    model = build_model(
-        model_args,
-        src_tokenizer,
-        tgt_tokenizer,
-        device,
-        attention_factory=make_attention_factory(requested_attention),
-    )
-    try:
-        model.load_state_dict(ckpt["model_state_dict"])
-    except RuntimeError as exc:
-        raise RuntimeError(
-            "Checkpoint passt nicht zur aktuellen Modellarchitektur. "
-            "Bitte mit der aktuellen Transformer-Version neu trainieren."
-        ) from exc
-    model.eval()
+    src_tokenizer, tgt_tokenizer = load_tokenizers_from_checkpoint(ckpt)
+    model = load_model_from_checkpoint(ckpt, src_tokenizer, tgt_tokenizer, device)
 
     def translate_text(text: str) -> str:
         src_ids = src_tokenizer.encode(text)
