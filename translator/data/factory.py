@@ -1,4 +1,4 @@
-from typing import Callable, List, Protocol, runtime_checkable
+from typing import List, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -26,21 +26,14 @@ class TokenizerProtocol(Protocol):
         ...
 
 
-TokenizerFactory = Callable[[List[str]], TokenizerProtocol]
 TOKENIZER_CHOICES = ("custom", "hf")
 
 
-def make_tokenizer_factory(tokenizer: str, hf_tokenizer_name: str) -> TokenizerFactory:
+def create_tokenizer(tokenizer: str, texts: List[str], hf_tokenizer_name: str) -> TokenizerProtocol:
     from .tokenizer import HuggingFaceTokenizerAdapter, Tokenizer
 
-    def make_custom_tokenizer_factory() -> TokenizerFactory:
-        return lambda sentences: Tokenizer.build(sentences)
-
-    def make_hf_tokenizer_factory() -> TokenizerFactory:
-        return lambda _: HuggingFaceTokenizerAdapter.from_pretrained(hf_tokenizer_name)
-
     if tokenizer == "custom":
-        return make_custom_tokenizer_factory()
+        return Tokenizer.build(texts)
     if tokenizer == "hf":
-        return make_hf_tokenizer_factory()
+        return HuggingFaceTokenizerAdapter.from_pretrained(hf_tokenizer_name)
     raise ValueError(f"Unknown tokenizer={tokenizer!r}. Allowed values: {TOKENIZER_CHOICES}.")

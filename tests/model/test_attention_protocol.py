@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 
 from translator.model.factory import (
-    make_attention_factory,
+    ATTENTION_CHOICES,
+    create_attention,
     AttentionProtocol,
 )
 from translator.model import Seq2Seq
@@ -26,7 +27,7 @@ def _dummy_batch(batch_size: int = 2, src_len: int = 5, tgt_len: int = 6):
     return src, tgt
 
 
-def _make_model(attention_factory):
+def _make_model(attention: str):
     return Seq2Seq(
         src_vocab_size=32,
         tgt_vocab_size=40,
@@ -39,33 +40,33 @@ def _make_model(attention_factory):
         tgt_sos_idx=2,
         dropout=0.0,
         max_len=32,
-        attention_factory=attention_factory,
+        attention=attention,
     )
 
 
-def test_attention_factories_return_protocol_compatible_modules():
-    for factory in (make_attention_factory("torch"), make_attention_factory("simple_sdp")):
-        attn = factory(16, 4, 0.0)
+def test_attention_choices_create_protocol_compatible_modules():
+    for attention in ATTENTION_CHOICES:
+        attn = create_attention(attention, 16, 4, 0.0)
         assert isinstance(attn, nn.Module)
         assert isinstance(attn, AttentionProtocol)
 
 
 def test_seq2seq_forward_works_with_torch_attention_factory():
-    model = _make_model(make_attention_factory("torch"))
+    model = _make_model("torch")
     src, tgt = _dummy_batch()
     logits = model(src, tgt)
     assert logits.shape == (src.size(0), tgt.size(1) - 1, 40)
 
 
 def test_seq2seq_forward_works_with_simple_sdp_attention_factory():
-    model = _make_model(make_attention_factory("simple_sdp"))
+    model = _make_model("simple_sdp")
     src, tgt = _dummy_batch()
     logits = model(src, tgt)
     assert logits.shape == (src.size(0), tgt.size(1) - 1, 40)
 
 
 def test_simple_sdp_attention_applies_masks_and_returns_expected_shapes():
-    attn = make_attention_factory("simple_sdp")(16, 4, 0.0)
+    attn = create_attention("simple_sdp", 16, 4, 0.0)
 
     query = torch.randn(2, 4, 16)
     key = torch.randn(2, 5, 16)
@@ -93,15 +94,9 @@ def test_simple_sdp_attention_applies_masks_and_returns_expected_shapes():
     assert weights.shape == (2, 4, 5)
 
 
-def test_invalid_attention_factory_raises_clear_error():
-    def bad_factory(d_model: int, num_heads: int, dropout: float):
-        del d_model, num_heads, dropout
-        return object()
-
-    model = _make_model(bad_factory)
-    src, tgt = _dummy_batch()
+def test_invalid_attention_choice_raises_clear_error():
     try:
-        model(src, tgt)
-        assert False, "expected runtime error"
-    except TypeError:
+        _make_model("invalid_attention")
+        assert False, "expected ValueError"
+    except ValueError:
         assert True

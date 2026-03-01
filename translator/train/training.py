@@ -12,9 +12,9 @@ from ..data import (
     set_seed,
     tiny_parallel_corpus,
 )
-from ..data.factory import TOKENIZER_CHOICES, TokenizerProtocol, make_tokenizer_factory
+from ..data.factory import TOKENIZER_CHOICES, TokenizerProtocol, create_tokenizer
 from ..model import Seq2Seq
-from ..model.factory import ATTENTION_CHOICES, AttentionFactory, make_attention_factory
+from ..model.factory import ATTENTION_CHOICES
 
 
 def build_model(
@@ -22,7 +22,7 @@ def build_model(
     src_tokenizer: TokenizerProtocol,
     tgt_tokenizer: TokenizerProtocol,
     device: torch.device,
-    attention_factory: AttentionFactory | None = None,
+    attention: str | None = None,
 ) -> Seq2Seq:
     tgt_sos_idx = tgt_tokenizer.bos_token_id
     if tgt_sos_idx is None:
@@ -34,8 +34,7 @@ def build_model(
     if src_pad_idx is None or tgt_pad_idx is None:
         raise ValueError("Tokenizer hat keinen pad_token_id.")
 
-    if attention_factory is None:
-        attention_factory = make_attention_factory(getattr(args, "attention", "torch"))
+    attention_name = attention if attention is not None else str(getattr(args, "attention", "torch"))
     model = Seq2Seq(
         src_vocab_size=src_tokenizer.vocab_size,
         tgt_vocab_size=tgt_tokenizer.vocab_size,
@@ -47,7 +46,7 @@ def build_model(
         tgt_pad_idx=tgt_pad_idx,
         tgt_sos_idx=tgt_sos_idx,
         dropout=args.dropout,
-        attention_factory=attention_factory,
+        attention=attention_name,
     ).to(device)
     return model
 
@@ -78,12 +77,17 @@ def train(args: argparse.Namespace) -> None:
             print(f"{src_text:20s} -> {tgt_tokenizer.decode(pred_ids)}")
 
     pairs = tiny_parallel_corpus()
-    tokenizer_factory = make_tokenizer_factory(
-        getattr(args, "tokenizer", "custom"),
+    tokenizer_name = str(getattr(args, "tokenizer", "custom"))
+    src_tokenizer = create_tokenizer(
+        tokenizer_name,
+        [p[0] for p in pairs],
         getattr(args, "hf_tokenizer_name", "bert-base-multilingual-cased"),
     )
-    src_tokenizer = tokenizer_factory([p[0] for p in pairs])
-    tgt_tokenizer = tokenizer_factory([p[1] for p in pairs])
+    tgt_tokenizer = create_tokenizer(
+        tokenizer_name,
+        [p[1] for p in pairs],
+        getattr(args, "hf_tokenizer_name", "bert-base-multilingual-cased"),
+    )
     src_pad_idx = src_tokenizer.pad_token_id
     tgt_pad_idx = tgt_tokenizer.pad_token_id
     if src_pad_idx is None or tgt_pad_idx is None:
@@ -96,7 +100,7 @@ def train(args: argparse.Namespace) -> None:
         src_tokenizer,
         tgt_tokenizer,
         device,
-        attention_factory=make_attention_factory(args.attention),
+        attention=args.attention,
     )
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_pad_idx)
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)

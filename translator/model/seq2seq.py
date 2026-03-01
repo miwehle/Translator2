@@ -4,7 +4,7 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from .factory import AttentionFactory, make_attention_factory
+from .factory import ATTENTION_CHOICES
 from .blocks import DecoderBlock, EncoderBlock
 
 
@@ -38,11 +38,13 @@ class Seq2Seq(nn.Module):
         tgt_sos_idx: int,
         dropout: float = 0.1,
         max_len: int = 1024,
-        attention_factory: AttentionFactory | None = None,
+        attention: str = "torch",
     ):
         super().__init__()
         if d_model % num_heads != 0:
             raise ValueError("d_model must be divisible by num_heads")
+        if attention not in ATTENTION_CHOICES:
+            raise ValueError(f"Unknown attention={attention!r}. Allowed values: {ATTENTION_CHOICES}.")
 
         self.src_pad_idx = src_pad_idx
         self.tgt_pad_idx = tgt_pad_idx
@@ -54,9 +56,6 @@ class Seq2Seq(nn.Module):
         self.pos_enc = PositionalEncoding(d_model, max_len=max_len)
         self.embed_dropout = nn.Dropout(dropout)
 
-        if attention_factory is None:
-            attention_factory = make_attention_factory("torch")
-
         self.encoder_layers = nn.ModuleList(
             [
                 EncoderBlock(
@@ -64,7 +63,7 @@ class Seq2Seq(nn.Module):
                     num_heads=num_heads,
                     ff_dim=ff_dim,
                     dropout=dropout,
-                    attention_factory=attention_factory,
+                    attention=attention,
                 )
                 for _ in range(num_layers)
             ]
@@ -76,7 +75,7 @@ class Seq2Seq(nn.Module):
                     num_heads=num_heads,
                     ff_dim=ff_dim,
                     dropout=dropout,
-                    attention_factory=attention_factory,
+                    attention=attention,
                 )
                 for _ in range(num_layers)
             ]

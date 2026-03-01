@@ -1,18 +1,18 @@
 import torch
 import torch.nn as nn
 
-from .factory import AttentionFactory, build_attention
+from .factory import AttentionProtocol, create_attention
 
 
 class EncoderBlock(nn.Module):
     """Transformer encoder block using Pre-Norm (LayerNorm before each sub-layer)."""
 
     def __init__(
-        self, d_model: int, num_heads: int, ff_dim: int, dropout: float, attention_factory: AttentionFactory
+        self, d_model: int, num_heads: int, ff_dim: int, dropout: float, attention: str
     ):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
-        self.self_attn = build_attention(attention_factory, d_model, num_heads, dropout)
+        self.self_attn: AttentionProtocol = create_attention(attention, d_model, num_heads, dropout)
         self.drop1 = nn.Dropout(dropout)
 
         self.norm2 = nn.LayerNorm(d_model)
@@ -44,15 +44,15 @@ class DecoderBlock(nn.Module):
     """Transformer decoder block using Pre-Norm (LayerNorm before each sub-layer)."""
 
     def __init__(
-        self, d_model: int, num_heads: int, ff_dim: int, dropout: float, attention_factory: AttentionFactory
+        self, d_model: int, num_heads: int, ff_dim: int, dropout: float, attention: str
     ):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
-        self.self_attn = build_attention(attention_factory, d_model, num_heads, dropout)
+        self.self_attn: AttentionProtocol = create_attention(attention, d_model, num_heads, dropout)
         self.drop1 = nn.Dropout(dropout)
 
         self.norm2 = nn.LayerNorm(d_model)
-        self.cross_attn = build_attention(attention_factory, d_model, num_heads, dropout)
+        self.cross_attn: AttentionProtocol = create_attention(attention, d_model, num_heads, dropout)
         self.drop2 = nn.Dropout(dropout)
 
         self.norm3 = nn.LayerNorm(d_model)

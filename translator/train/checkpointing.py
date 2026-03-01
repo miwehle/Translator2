@@ -7,10 +7,9 @@ import torch
 from ..data import deserialize_tokenizer, serialize_tokenizer
 from ..data.factory import TokenizerProtocol
 from ..model import Seq2Seq
-from ..model.factory import AttentionFactory, make_attention_factory
 
 BuildModelFn = Callable[
-    [argparse.Namespace, TokenizerProtocol, TokenizerProtocol, torch.device, AttentionFactory | None], Seq2Seq
+    [argparse.Namespace, TokenizerProtocol, TokenizerProtocol, torch.device, str | None], Seq2Seq
 ]
 
 
@@ -90,7 +89,7 @@ def _load_model_from_checkpoint_payload(
         src_tokenizer,
         tgt_tokenizer,
         device,
-        make_attention_factory(requested_attention),
+        requested_attention,
     )
     try:
         model.load_state_dict(ckpt["model_state_dict"])

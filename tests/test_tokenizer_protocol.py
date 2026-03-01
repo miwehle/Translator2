@@ -2,7 +2,7 @@ import argparse
 
 import torch
 
-from translator.data.factory import TOKENIZER_CHOICES, TokenizerProtocol, make_tokenizer_factory
+from translator.data.factory import TOKENIZER_CHOICES, TokenizerProtocol, create_tokenizer
 from translator.data import (
     Tokenizer,
     deserialize_tokenizer,
@@ -79,10 +79,9 @@ def test_tokenizer_choices_include_custom_and_hf():
     assert TOKENIZER_CHOICES == ("custom", "hf")
 
 
-def test_make_tokenizer_factory_custom_builds_project_tokenizer():
+def test_create_tokenizer_custom_builds_project_tokenizer():
     pairs = tiny_parallel_corpus()
-    tokenizer_factory = make_tokenizer_factory("custom", "unused")
-    tokenizer = tokenizer_factory([p[0] for p in pairs])
+    tokenizer = create_tokenizer("custom", [p[0] for p in pairs], "unused")
 
     assert isinstance(tokenizer, Tokenizer)
 

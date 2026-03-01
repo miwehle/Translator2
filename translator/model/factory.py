@@ -1,4 +1,4 @@
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import torch
 import torch.nn as nn
@@ -29,37 +29,24 @@ class AttentionProtocol(Protocol):
         ...
 
 
-AttentionFactory = Callable[[int, int, float], AttentionProtocol]
 ATTENTION_CHOICES = ("torch", "simple_sdp")
 
 
-def make_attention_factory(attention: str) -> AttentionFactory:
+def create_attention(attention: str, d_model: int, num_heads: int, dropout: float) -> AttentionProtocol:
     from .attention import SimpleMultiheadSDPAttention
 
-    def make_torch_attention_factory() -> AttentionFactory:
-        return lambda d_model, num_heads, dropout: nn.MultiheadAttention(
-            embed_dim=d_model,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
-
-    def make_simple_sdp_attention_factory() -> AttentionFactory:
-        return lambda d_model, num_heads, dropout: SimpleMultiheadSDPAttention(
-            embed_dim=d_model,
-            num_heads=num_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
-
     if attention == "torch":
-        return make_torch_attention_factory()
+        return nn.MultiheadAttention(
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+        )
     if attention == "simple_sdp":
-        return make_simple_sdp_attention_factory()
+        return SimpleMultiheadSDPAttention(
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+        )
     raise ValueError(f"Unknown attention={attention!r}. Allowed values: {ATTENTION_CHOICES}.")
-
-
-def build_attention(
-    attention_factory: AttentionFactory, d_model: int, num_heads: int, dropout: float
-) -> AttentionProtocol:
-    return attention_factory(d_model, num_heads, dropout)
