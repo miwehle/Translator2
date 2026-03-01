@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from .attention import ATTENTION_CHOICES, AttentionFactory, make_attention_factory
+from .model.attention import ATTENTION_CHOICES, AttentionFactory, make_attention_factory
 from .data import Tokenizer, TranslationDataset, collate_fn, set_seed, tiny_parallel_corpus
 from .model import Seq2Seq
 

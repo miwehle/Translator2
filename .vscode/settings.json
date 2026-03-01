@@ -5,5 +5,18 @@
     "tests"
   ],
   "python.analysis.diagnosticMode": "workspace",
-  "python.analysis.typeCheckingMode": "basic"
+  "python.analysis.typeCheckingMode": "basic",
+
+  "files.exclude": {
+      // __pycache__ im Explorer ausblenden
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.pytest_tmp": true,
+    "**/pytest-cache-files-*": true,
+
+      // .coverage auch
+      ".coverage": true,
+      ".coverage.*": true
+  }
+
 }
