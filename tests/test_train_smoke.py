@@ -70,6 +70,8 @@ def test_save_and_load_checkpoint_roundtrip():
     assert "model_state_dict" in ckpt
     assert "src_tokenizer" in ckpt
     assert "tgt_tokenizer" in ckpt
+    assert ckpt["src_tokenizer"]["provider"] == "custom"
+    assert ckpt["tgt_tokenizer"]["provider"] == "custom"
     assert ckpt["hparams"]["num_heads"] == 4
     assert ckpt["hparams"]["num_layers"] == 1
 

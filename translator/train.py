@@ -1,23 +1,44 @@
 import argparse
 from pathlib import Path
-from typing import Any, Dict, cast
+from typing import Any, Dict
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from .model.attention import ATTENTION_CHOICES, AttentionFactory, make_attention_factory
-from .data import Tokenizer, TranslationDataset, collate_fn, set_seed, tiny_parallel_corpus
+from .data import (
+    TOKENIZER_CHOICES,
+    Tokenizer,
+    TokenizerProtocol,
+    TranslationDataset,
+    collate_fn,
+    deserialize_tokenizer,
+    make_tokenizer_factory,
+    serialize_tokenizer,
+    set_seed,
+    tiny_parallel_corpus,
+)
 from .model import Seq2Seq
 
 
 def build_model(
     args: argparse.Namespace,
-    src_tokenizer: Tokenizer,
-    tgt_tokenizer: Tokenizer,
+    src_tokenizer: TokenizerProtocol,
+    tgt_tokenizer: TokenizerProtocol,
     device: torch.device,
     attention_factory: AttentionFactory | None = None,
 ) -> Seq2Seq:
+    tgt_sos_idx = tgt_tokenizer.bos_token_id
+    if tgt_sos_idx is None:
+        tgt_sos_idx = getattr(tgt_tokenizer, "sos_token_id", None)
+    if tgt_sos_idx is None:
+        raise ValueError("Tokenizer hat keinen Start-Token (bos_token_id/sos_token_id).")
+    src_pad_idx = src_tokenizer.pad_token_id
+    tgt_pad_idx = tgt_tokenizer.pad_token_id
+    if src_pad_idx is None or tgt_pad_idx is None:
+        raise ValueError("Tokenizer hat keinen pad_token_id.")
+
     if attention_factory is None:
         attention_factory = make_attention_factory(getattr(args, "attention", "torch"))
     model = Seq2Seq(
@@ -27,9 +48,9 @@ def build_model(
         ff_dim=args.hidden_dim,
         num_heads=args.num_heads,
         num_layers=args.num_layers,
-        src_pad_idx=src_tokenizer.pad_token_id,
-        tgt_pad_idx=tgt_tokenizer.pad_token_id,
-        tgt_sos_idx=tgt_tokenizer.sos_token_id,
+        src_pad_idx=src_pad_idx,
+        tgt_pad_idx=tgt_pad_idx,
+        tgt_sos_idx=tgt_sos_idx,
         dropout=args.dropout,
         attention_factory=attention_factory,
     ).to(device)
@@ -39,16 +60,16 @@ def build_model(
 def save_checkpoint(
     path: str,
     model: Seq2Seq,
-    src_tokenizer: Tokenizer,
-    tgt_tokenizer: Tokenizer,
+    src_tokenizer: TokenizerProtocol,
+    tgt_tokenizer: TokenizerProtocol,
     args: argparse.Namespace,
 ) -> None:
     checkpoint_dir = Path(path).parent
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     payload: Dict[str, Any] = {
         "model_state_dict": model.state_dict(),
-        "src_tokenizer": {"stoi": src_tokenizer.stoi, "itos": src_tokenizer.itos},
-        "tgt_tokenizer": {"stoi": tgt_tokenizer.stoi, "itos": tgt_tokenizer.itos},
+        "src_tokenizer": serialize_tokenizer(src_tokenizer),
+        "tgt_tokenizer": serialize_tokenizer(tgt_tokenizer),
         "hparams": {
             "emb_dim": args.emb_dim,
             "hidden_dim": args.hidden_dim,
@@ -56,6 +77,7 @@ def save_checkpoint(
             "num_layers": args.num_layers,
             "dropout": args.dropout,
             "attention": getattr(args, "attention", "torch"),
+            "tokenizer": getattr(args, "tokenizer", "custom"),
         },
     }
     torch.save(payload, path)
@@ -69,15 +91,15 @@ def load_checkpoint(path: str, device: torch.device) -> Dict[str, Any]:
 
 def train(args: argparse.Namespace) -> None:
     set_seed(args.seed)
-    
-    def create_data_loader(pairs, src_tokenizer, tgt_tokenizer):
+
+    def create_data_loader(pairs, src_tokenizer, tgt_tokenizer, src_pad_idx: int, tgt_pad_idx: int):
         dataset = TranslationDataset(pairs, src_tokenizer, tgt_tokenizer)
         loader = DataLoader(
             dataset,
             batch_size=args.batch_size,
             shuffle=True,
             collate_fn=lambda batch: collate_fn(
-                batch, src_tokenizer.pad_token_id, tgt_tokenizer.pad_token_id
+                batch, src_pad_idx, tgt_pad_idx
             ),
         )
         return loader
@@ -93,10 +115,18 @@ def train(args: argparse.Namespace) -> None:
             print(f"{src_text:20s} -> {tgt_tokenizer.decode(pred_ids)}")
 
     pairs = tiny_parallel_corpus()
-    src_tokenizer = Tokenizer.build([p[0] for p in pairs])
-    tgt_tokenizer = Tokenizer.build([p[1] for p in pairs])
+    tokenizer_factory = make_tokenizer_factory(
+        getattr(args, "tokenizer", "custom"),
+        getattr(args, "hf_tokenizer_name", "bert-base-multilingual-cased"),
+    )
+    src_tokenizer = tokenizer_factory([p[0] for p in pairs])
+    tgt_tokenizer = tokenizer_factory([p[1] for p in pairs])
+    src_pad_idx = src_tokenizer.pad_token_id
+    tgt_pad_idx = tgt_tokenizer.pad_token_id
+    if src_pad_idx is None or tgt_pad_idx is None:
+        raise ValueError("Tokenizer hat keinen pad_token_id.")
 
-    loader = create_data_loader(pairs, src_tokenizer, tgt_tokenizer)
+    loader = create_data_loader(pairs, src_tokenizer, tgt_tokenizer, src_pad_idx, tgt_pad_idx)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_model(
         args,
@@ -105,7 +135,7 @@ def train(args: argparse.Namespace) -> None:
         device,
         attention_factory=make_attention_factory(args.attention),
     )
-    criterion = nn.CrossEntropyLoss(ignore_index=tgt_tokenizer.pad_token_id)
+    criterion = nn.CrossEntropyLoss(ignore_index=tgt_pad_idx)
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
     model.train()
 
@@ -134,23 +164,15 @@ def train(args: argparse.Namespace) -> None:
 
 
 def run_translate(args: argparse.Namespace, interactive: bool) -> None:
-    def load_tokenizers_from_checkpoint(ckpt: Dict[str, Any]) -> tuple[Tokenizer, Tokenizer]:
+    def load_tokenizers_from_checkpoint(ckpt: Dict[str, Any]) -> tuple[TokenizerProtocol, TokenizerProtocol]:
         src_data = ckpt.get("src_tokenizer")
         tgt_data = ckpt.get("tgt_tokenizer")
         if not isinstance(src_data, dict) or not isinstance(tgt_data, dict):
             raise ValueError("Checkpoint enthaelt keine gueltigen Tokenizer-Daten.")
-
-        src_stoi = cast(dict[str, int], src_data.get("stoi"))
-        src_itos = cast(list[str], src_data.get("itos"))
-        tgt_stoi = cast(dict[str, int], tgt_data.get("stoi"))
-        tgt_itos = cast(list[str], tgt_data.get("itos"))
-        if src_stoi is None or src_itos is None or tgt_stoi is None or tgt_itos is None:
-            raise ValueError("Checkpoint enthaelt unvollstaendige Tokenizer-Daten.")
-
-        return Tokenizer(stoi=src_stoi, itos=src_itos), Tokenizer(stoi=tgt_stoi, itos=tgt_itos)
+        return deserialize_tokenizer(src_data), deserialize_tokenizer(tgt_data)
 
     def load_model_from_checkpoint(
-        ckpt: Dict[str, Any], src_tokenizer: Tokenizer, tgt_tokenizer: Tokenizer, device: torch.device
+        ckpt: Dict[str, Any], src_tokenizer: TokenizerProtocol, tgt_tokenizer: TokenizerProtocol, device: torch.device
     ) -> Seq2Seq:
         hparams = ckpt["hparams"]
         trained_attention = hparams.get("attention", "torch")
@@ -159,6 +181,13 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
             raise ValueError(
                 f"Attention-Mismatch: Checkpoint nutzt '{trained_attention}', "
                 f"CLI fordert '{requested_attention}'."
+            )
+        trained_tokenizer = hparams.get("tokenizer", "custom")
+        requested_tokenizer = getattr(args, "tokenizer", "custom")
+        if requested_tokenizer != trained_tokenizer:
+            raise ValueError(
+                f"Tokenizer-Mismatch: Checkpoint nutzt '{trained_tokenizer}', "
+                f"CLI fordert '{requested_tokenizer}'."
             )
 
         model_args = argparse.Namespace(
@@ -189,11 +218,14 @@ def run_translate(args: argparse.Namespace, interactive: bool) -> None:
     ckpt = load_checkpoint(args.checkpoint_path, device)
     src_tokenizer, tgt_tokenizer = load_tokenizers_from_checkpoint(ckpt)
     model = load_model_from_checkpoint(ckpt, src_tokenizer, tgt_tokenizer, device)
+    tgt_eos_idx = tgt_tokenizer.eos_token_id
+    if tgt_eos_idx is None:
+        raise ValueError("Tokenizer hat keinen eos_token_id.")
 
     def translate_text(text: str) -> str:
         src_ids = src_tokenizer.encode(text)
         pred_ids = model.translate(
-            src_ids, max_len=args.max_len, device=device, eos_idx=tgt_tokenizer.eos_token_id
+            src_ids, max_len=args.max_len, device=device, eos_idx=tgt_eos_idx
         )
         return tgt_tokenizer.decode(pred_ids)
 
@@ -229,6 +261,8 @@ def main() -> None:
         p.add_argument("--seed", type=int, default=42)
         p.add_argument("--checkpoint-path", type=str, default="checkpoints/translator.pt")
         p.add_argument("--attention", type=str, choices=ATTENTION_CHOICES, default="torch")
+        p.add_argument("--tokenizer", type=str, choices=TOKENIZER_CHOICES, default="custom")
+        p.add_argument("--hf-tokenizer-name", type=str, default="bert-base-multilingual-cased")
         p.add_argument("--translate", type=str, default=None)
         p.add_argument("--interactive", action="store_true")
         p.add_argument("--max-len", type=int, default=30)
