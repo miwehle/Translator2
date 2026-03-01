@@ -14,9 +14,14 @@ def set_seed(seed: int) -> None:
 
 class TranslationDataset(Dataset):
     def __init__(
-        self, pairs: List[Tuple[str, str]], src_tokenizer: TokenizerProtocol, tgt_tokenizer: TokenizerProtocol
+        self,
+        pairs: List[Tuple[str, str]],
+        src_tokenizer: TokenizerProtocol,
+        tgt_tokenizer: TokenizerProtocol,
     ):
-        self.data = [(src_tokenizer.encode(src), tgt_tokenizer.encode(tgt)) for src, tgt in pairs]
+        self.data = [
+            (src_tokenizer.encode(src), tgt_tokenizer.encode(tgt)) for src, tgt in pairs
+        ]
 
     def __len__(self) -> int:
         return len(self.data)

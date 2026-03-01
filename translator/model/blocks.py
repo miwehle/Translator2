@@ -12,7 +12,9 @@ class EncoderBlock(nn.Module):
     ):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
-        self.self_attn: AttentionProtocol = create_attention(attention, d_model, num_heads, dropout)
+        self.self_attn: AttentionProtocol = create_attention(
+            attention, d_model, num_heads, dropout
+        )
         self.drop1 = nn.Dropout(dropout)
 
         self.norm2 = nn.LayerNorm(d_model)
@@ -24,7 +26,9 @@ class EncoderBlock(nn.Module):
         )
         self.drop2 = nn.Dropout(dropout)
 
-    def forward(self, x: torch.Tensor, src_key_padding_mask: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, src_key_padding_mask: torch.Tensor
+    ) -> torch.Tensor:
         y = self.norm1(x)
         attn_out, _ = self.self_attn(
             y,
@@ -48,11 +52,15 @@ class DecoderBlock(nn.Module):
     ):
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
-        self.self_attn: AttentionProtocol = create_attention(attention, d_model, num_heads, dropout)
+        self.self_attn: AttentionProtocol = create_attention(
+            attention, d_model, num_heads, dropout
+        )
         self.drop1 = nn.Dropout(dropout)
 
         self.norm2 = nn.LayerNorm(d_model)
-        self.cross_attn: AttentionProtocol = create_attention(attention, d_model, num_heads, dropout)
+        self.cross_attn: AttentionProtocol = create_attention(
+            attention, d_model, num_heads, dropout
+        )
         self.drop2 = nn.Dropout(dropout)
 
         self.norm3 = nn.LayerNorm(d_model)

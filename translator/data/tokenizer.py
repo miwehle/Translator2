@@ -34,7 +34,9 @@ class Tokenizer:
         ids: List[int] = []
         if add_special_tokens:
             ids.append(self.sos_token_id)
-        ids.extend(self.stoi.get(tok, self.unk_token_id) for tok in self._tokenize(text))
+        ids.extend(
+            self.stoi.get(tok, self.unk_token_id) for tok in self._tokenize(text)
+        )
         if add_special_tokens:
             ids.append(self.eos_token_id)
         return ids
@@ -62,21 +64,29 @@ class Tokenizer:
         if isinstance(texts, str):
             texts = [texts]
 
-        input_ids = [self.encode(text, add_special_tokens=add_special_tokens) for text in texts]
+        input_ids = [
+            self.encode(text, add_special_tokens=add_special_tokens) for text in texts
+        ]
 
         if truncation and max_length is not None:
             input_ids = [ids[:max_length] for ids in input_ids]
 
         attention_mask = [[1] * len(ids) for ids in input_ids]
 
-        needs_padding = padding is True or padding == "longest" or padding == "max_length"
+        needs_padding = (
+            padding is True or padding == "longest" or padding == "max_length"
+        )
         if needs_padding:
             if max_length is not None and padding == "max_length":
                 target_len = max_length
             else:
                 target_len = max(len(ids) for ids in input_ids)
-            input_ids = [ids + [self.pad_token_id] * (target_len - len(ids)) for ids in input_ids]
-            attention_mask = [mask + [0] * (target_len - len(mask)) for mask in attention_mask]
+            input_ids = [
+                ids + [self.pad_token_id] * (target_len - len(ids)) for ids in input_ids
+            ]
+            attention_mask = [
+                mask + [0] * (target_len - len(mask)) for mask in attention_mask
+            ]
 
         if return_tensors == "pt":
             return {
@@ -130,16 +140,24 @@ class HuggingFaceTokenizerAdapter:
         return cls(AutoTokenizer.from_pretrained(model_name), tokenizer_name=model_name)
 
     @classmethod
-    def from_checkpoint_payload(cls, payload: Dict[str, Any]) -> "HuggingFaceTokenizerAdapter":
+    def from_checkpoint_payload(
+        cls, payload: Dict[str, Any]
+    ) -> "HuggingFaceTokenizerAdapter":
         files = payload.get("files")
         if not isinstance(files, dict) or not files:
-            raise ValueError("HF-Tokenizerdaten im Checkpoint sind ungueltig oder unvollstaendig.")
+            raise ValueError(
+                "HF-Tokenizerdaten im Checkpoint sind ungueltig oder unvollstaendig."
+            )
         tokenizer_name = payload.get("tokenizer_name")
         with TemporaryDirectory(prefix="hf_tok_load_") as tmp:
             tmp_path = Path(tmp)
             for name, blob in files.items():
-                if not isinstance(name, str) or not isinstance(blob, (bytes, bytearray)):
-                    raise ValueError("HF-Tokenizerdateien im Checkpoint haben ein ungueltiges Format.")
+                if not isinstance(name, str) or not isinstance(
+                    blob, (bytes, bytearray)
+                ):
+                    raise ValueError(
+                        "HF-Tokenizerdateien im Checkpoint haben ein ungueltiges Format."
+                    )
                 (tmp_path / name).write_bytes(bytes(blob))
 
             try:
@@ -148,7 +166,9 @@ class HuggingFaceTokenizerAdapter:
                 raise ImportError(
                     "Checkpoint enthaelt HF-Tokenizerdaten, aber 'transformers' ist nicht installiert."
                 ) from exc
-            tokenizer = AutoTokenizer.from_pretrained(str(tmp_path), local_files_only=True)
+            tokenizer = AutoTokenizer.from_pretrained(
+                str(tmp_path), local_files_only=True
+            )
         if isinstance(tokenizer_name, str):
             return cls(tokenizer, tokenizer_name=tokenizer_name)
         return cls(tokenizer)
@@ -233,7 +253,9 @@ def deserialize_tokenizer(payload: Dict[str, Any]) -> TokenizerProtocol:
         stoi = payload.get("stoi")
         itos = payload.get("itos")
         if not isinstance(stoi, dict) or not isinstance(itos, list):
-            raise ValueError("Custom-Tokenizerdaten im Checkpoint sind ungueltig oder unvollstaendig.")
+            raise ValueError(
+                "Custom-Tokenizerdaten im Checkpoint sind ungueltig oder unvollstaendig."
+            )
         return Tokenizer(stoi=stoi, itos=itos)
     if provider == "hf":
         return HuggingFaceTokenizerAdapter.from_checkpoint_payload(payload)

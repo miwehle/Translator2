@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 
+from translator.model import Seq2Seq
 from translator.model.factory import (
     ATTENTION_CHOICES,
-    create_attention,
     AttentionProtocol,
+    create_attention,
 )
-from translator.model import Seq2Seq
 
 
 def _dummy_batch(batch_size: int = 2, src_len: int = 5, tgt_len: int = 6):

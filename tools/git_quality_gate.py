@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import subprocess
 import sys
-import importlib.util
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -77,7 +76,9 @@ def main() -> int:
     if stage == "pre-commit":
         files = staged_python_files(env)
         if not files:
-            print("[quality-gate] pre-commit: no staged Python files, skipping pyright.")
+            print(
+                "[quality-gate] pre-commit: no staged Python files, skipping pyright."
+            )
             return 0
         if run_pyright_for_files(env, files) != 0:
             return 1

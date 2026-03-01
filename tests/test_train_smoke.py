@@ -8,8 +8,8 @@ from translator.data import Tokenizer, tiny_parallel_corpus
 from translator.model import Seq2Seq
 from translator.train import (
     build_model,
-    load_inference_components,
     load_checkpoint,
+    load_inference_components,
     run_translate,
     save_checkpoint,
     train,
@@ -148,8 +148,8 @@ def test_load_inference_components_returns_model_and_tokenizers():
     model = build_model(args, src_tokenizer, tgt_tokenizer, torch.device("cpu"))
     save_checkpoint(str(ckpt_path), model, src_tokenizer, tgt_tokenizer, args)
 
-    loaded_model, loaded_src_tokenizer, loaded_tgt_tokenizer = load_inference_components(
-        str(ckpt_path), torch.device("cpu"), args
+    loaded_model, loaded_src_tokenizer, loaded_tgt_tokenizer = (
+        load_inference_components(str(ckpt_path), torch.device("cpu"), args)
     )
 
     assert isinstance(loaded_model, Seq2Seq)

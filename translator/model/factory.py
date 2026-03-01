@@ -12,8 +12,7 @@ class AttentionProtocol(Protocol):
         self,
         *args: Any,
         **kwargs: Any,
-    ) -> tuple[torch.Tensor, torch.Tensor | None]:
-        ...
+    ) -> tuple[torch.Tensor, torch.Tensor | None]: ...
 
     def forward(
         self,
@@ -25,14 +24,15 @@ class AttentionProtocol(Protocol):
         attn_mask: torch.Tensor | None = None,
         average_attn_weights: bool = True,
         is_causal: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor | None]:
-        ...
+    ) -> tuple[torch.Tensor, torch.Tensor | None]: ...
 
 
 ATTENTION_CHOICES = ("torch", "simple_sdp")
 
 
-def create_attention(attention: str, d_model: int, num_heads: int, dropout: float) -> AttentionProtocol:
+def create_attention(
+    attention: str, d_model: int, num_heads: int, dropout: float
+) -> AttentionProtocol:
     from .attention import SimpleMultiheadSDPAttention
 
     if attention == "torch":
@@ -49,4 +49,6 @@ def create_attention(attention: str, d_model: int, num_heads: int, dropout: floa
             dropout=dropout,
             batch_first=True,
         )
-    raise ValueError(f"Unknown attention={attention!r}. Allowed values: {ATTENTION_CHOICES}.")
+    raise ValueError(
+        f"Unknown attention={attention!r}. Allowed values: {ATTENTION_CHOICES}."
+    )

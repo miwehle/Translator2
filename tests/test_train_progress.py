@@ -50,7 +50,16 @@ def build_training_objects():
     model = build_model(args, src_tokenizer, tgt_tokenizer, device)
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_tokenizer.pad_token_id)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    return model, loader, criterion, optimizer, src_tokenizer, tgt_tokenizer, device, pairs
+    return (
+        model,
+        loader,
+        criterion,
+        optimizer,
+        src_tokenizer,
+        tgt_tokenizer,
+        device,
+        pairs,
+    )
 
 
 def batch_loss(model, criterion, batch, device):
@@ -61,7 +70,9 @@ def batch_loss(model, criterion, batch, device):
     return criterion(logits.reshape(-1, logits.size(-1)), tgt[:, 1:].reshape(-1))
 
 
-def translation_match_count(model, pairs, src_tokenizer, tgt_tokenizer, device, n_samples=5):
+def translation_match_count(
+    model, pairs, src_tokenizer, tgt_tokenizer, device, n_samples=5
+):
     count = 0
     for src_text, tgt_text in pairs[:n_samples]:
         pred_ids = model.translate(
@@ -81,7 +92,9 @@ def test_loss_decreases_over_updates():
 
     model.eval()
     with torch.no_grad():
-        initial_loss = float(batch_loss(model, criterion, first_batch, torch.device("cpu")).item())
+        initial_loss = float(
+            batch_loss(model, criterion, first_batch, torch.device("cpu")).item()
+        )
 
     model.train()
     for _ in range(20):
@@ -94,14 +107,18 @@ def test_loss_decreases_over_updates():
 
     model.eval()
     with torch.no_grad():
-        final_loss = float(batch_loss(model, criterion, first_batch, torch.device("cpu")).item())
+        final_loss = float(
+            batch_loss(model, criterion, first_batch, torch.device("cpu")).item()
+        )
 
     min_abs_drop = 0.2
     assert (initial_loss - final_loss) >= min_abs_drop
 
 
 def test_translation_quality_improves_after_training():
-    model, loader, criterion, optimizer, src_tokenizer, tgt_tokenizer, device, pairs = build_training_objects()
+    model, loader, criterion, optimizer, src_tokenizer, tgt_tokenizer, device, pairs = (
+        build_training_objects()
+    )
 
     model.eval()
     before = translation_match_count(model, pairs, src_tokenizer, tgt_tokenizer, device)

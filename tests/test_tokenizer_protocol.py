@@ -2,12 +2,16 @@ import argparse
 
 import torch
 
-from translator.data.factory import TOKENIZER_CHOICES, TokenizerProtocol, create_tokenizer
 from translator.data import (
     Tokenizer,
     deserialize_tokenizer,
     serialize_tokenizer,
     tiny_parallel_corpus,
+)
+from translator.data.factory import (
+    TOKENIZER_CHOICES,
+    TokenizerProtocol,
+    create_tokenizer,
 )
 from translator.train import build_model
 

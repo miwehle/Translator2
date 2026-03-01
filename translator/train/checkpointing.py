@@ -9,7 +9,14 @@ from ..data.factory import TokenizerProtocol
 from ..model import Seq2Seq
 
 BuildModelFn = Callable[
-    [argparse.Namespace, TokenizerProtocol, TokenizerProtocol, torch.device, str | None], Seq2Seq
+    [
+        argparse.Namespace,
+        TokenizerProtocol,
+        TokenizerProtocol,
+        torch.device,
+        str | None,
+    ],
+    Seq2Seq,
 ]
 
 
@@ -45,7 +52,9 @@ def load_checkpoint(path: str, device: torch.device) -> Dict[str, Any]:
     return ckpt
 
 
-def _load_tokenizers_from_checkpoint_payload(ckpt: Dict[str, Any]) -> tuple[TokenizerProtocol, TokenizerProtocol]:
+def _load_tokenizers_from_checkpoint_payload(
+    ckpt: Dict[str, Any],
+) -> tuple[TokenizerProtocol, TokenizerProtocol]:
     src_data = ckpt.get("src_tokenizer")
     tgt_data = ckpt.get("tgt_tokenizer")
     if not isinstance(src_data, dict) or not isinstance(tgt_data, dict):
@@ -114,5 +123,7 @@ def load_inference_components(
 
     ckpt = load_checkpoint(path, device)
     src_tokenizer, tgt_tokenizer = _load_tokenizers_from_checkpoint_payload(ckpt)
-    model = _load_model_from_checkpoint_payload(ckpt, src_tokenizer, tgt_tokenizer, device, args, build_model_fn)
+    model = _load_model_from_checkpoint_payload(
+        ckpt, src_tokenizer, tgt_tokenizer, device, args, build_model_fn
+    )
     return model, src_tokenizer, tgt_tokenizer
