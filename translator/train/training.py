@@ -12,7 +12,8 @@ from ..data import (
     set_seed,
     tiny_parallel_corpus,
 )
-from ..data.factory import TOKENIZER_CHOICES, TokenizerProtocol, create_tokenizer
+from ..data.factory import TOKENIZER_CHOICES, TokenizerProtocol
+from ..data import factory as data_factory
 from ..model import Seq2Seq
 from ..model.factory import ATTENTION_CHOICES
 
@@ -66,6 +67,12 @@ def train(args: argparse.Namespace) -> None:
         )
         return loader
 
+    def create_tokenizer(texts):
+        return data_factory.create_tokenizer(
+            str(getattr(args, "tokenizer", "custom")), texts,
+            getattr(args, "hf_tokenizer_name", "bert-base-multilingual-cased"),
+    )
+
     def print_sample_translations(model, pairs, src_tokenizer, tgt_tokenizer):
         model.eval()
         print("\nBeispiele:")
@@ -77,17 +84,8 @@ def train(args: argparse.Namespace) -> None:
             print(f"{src_text:20s} -> {tgt_tokenizer.decode(pred_ids)}")
 
     pairs = tiny_parallel_corpus()
-    tokenizer_name = str(getattr(args, "tokenizer", "custom"))
-    src_tokenizer = create_tokenizer(
-        tokenizer_name,
-        [p[0] for p in pairs],
-        getattr(args, "hf_tokenizer_name", "bert-base-multilingual-cased"),
-    )
-    tgt_tokenizer = create_tokenizer(
-        tokenizer_name,
-        [p[1] for p in pairs],
-        getattr(args, "hf_tokenizer_name", "bert-base-multilingual-cased"),
-    )
+    src_tokenizer = create_tokenizer([p[0] for p in pairs])
+    tgt_tokenizer = create_tokenizer([p[1] for p in pairs])
     src_pad_idx = src_tokenizer.pad_token_id
     tgt_pad_idx = tgt_tokenizer.pad_token_id
     if src_pad_idx is None or tgt_pad_idx is None:
