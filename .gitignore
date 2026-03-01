@@ -6,3 +6,5 @@ __pycache__/
 pytest-cache-files-*/
 tests/.pytest_tmp_local/
 tests/.test_artifacts/
+.coverage
+.coverage.*
