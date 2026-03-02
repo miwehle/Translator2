@@ -1,6 +1,7 @@
 import argparse
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any
 
 import torch
 
@@ -29,7 +30,7 @@ def save_checkpoint(
 ) -> None:
     checkpoint_dir = Path(path).parent
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "model_state_dict": model.state_dict(),
         "src_tokenizer": serialize_tokenizer(src_tokenizer),
         "tgt_tokenizer": serialize_tokenizer(tgt_tokenizer),
@@ -47,13 +48,13 @@ def save_checkpoint(
     print(f"\nCheckpoint gespeichert: {path}")
 
 
-def load_checkpoint(path: str, device: torch.device) -> Dict[str, Any]:
+def load_checkpoint(path: str, device: torch.device) -> dict[str, Any]:
     ckpt = torch.load(path, map_location=device)
     return ckpt
 
 
 def _load_tokenizers_from_checkpoint_payload(
-    ckpt: Dict[str, Any],
+    ckpt: dict[str, Any],
 ) -> tuple[TokenizerProtocol, TokenizerProtocol]:
     src_data = ckpt.get("src_tokenizer")
     tgt_data = ckpt.get("tgt_tokenizer")
@@ -63,7 +64,7 @@ def _load_tokenizers_from_checkpoint_payload(
 
 
 def _load_model_from_checkpoint_payload(
-    ckpt: Dict[str, Any],
+    ckpt: dict[str, Any],
     src_tokenizer: TokenizerProtocol,
     tgt_tokenizer: TokenizerProtocol,
     device: torch.device,

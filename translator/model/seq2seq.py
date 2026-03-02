@@ -1,5 +1,4 @@
 import math
-from typing import List
 
 import torch
 import torch.nn as nn
@@ -127,19 +126,23 @@ class Seq2Seq(nn.Module):
 
     def forward(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
         memory, src_key_padding_mask = self.encode(src)
-        # Teacher forcing input: decoder sees target tokens up to t-1 to predict token t.
+        # Teacher forcing input: decoder sees target tokens up to t-1
+        # to predict token t.
         tgt_in = tgt[:, :-1]
         return self.decode(tgt_in, memory, src_key_padding_mask)
 
     @torch.no_grad()
     def translate(
-        self, src_ids: List[int], max_len: int, device: torch.device, eos_idx: int
-    ) -> List[int]:
-        """Simple inference: greedy argmax decoding only (no beam search or sampling)."""
+        self, src_ids: list[int], max_len: int, device: torch.device, eos_idx: int
+    ) -> list[int]:
+        """Simple inference: greedy argmax decoding only.
+
+        This intentionally does not implement beam search or sampling.
+        """
         src = torch.tensor([src_ids], dtype=torch.long, device=device)
         memory, src_key_padding_mask = self.encode(src)
 
-        out_ids: List[int] = [self.tgt_sos_idx]
+        out_ids: list[int] = [self.tgt_sos_idx]
         for _ in range(max_len):
             tgt_in = torch.tensor([out_ids], dtype=torch.long, device=device)
             logits = self.decode(tgt_in, memory, src_key_padding_mask)

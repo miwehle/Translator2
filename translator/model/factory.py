@@ -6,7 +6,10 @@ import torch.nn as nn
 
 @runtime_checkable
 class AttentionProtocol(Protocol):
-    """Shared attention contract matching PyTorch MHA, so custom attention can be swapped in safely."""
+    """Shared attention contract matching PyTorch MHA.
+
+    This keeps custom attention swappable with the PyTorch module.
+    """
 
     def __call__(
         self,

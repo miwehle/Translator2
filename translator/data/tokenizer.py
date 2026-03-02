@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, List, Union
+from typing import Any
 
 import torch
 
@@ -11,15 +11,15 @@ from .factory import TokenizerProtocol
 
 @dataclass
 class Tokenizer:
-    stoi: Dict[str, int]
-    itos: List[str]
+    stoi: dict[str, int]
+    itos: list[str]
 
     @staticmethod
-    def _tokenize(text: str) -> List[str]:
+    def _tokenize(text: str) -> list[str]:
         return text.lower().strip().split()
 
     @classmethod
-    def build(cls, sentences: List[str]) -> "Tokenizer":
+    def build(cls, sentences: list[str]) -> "Tokenizer":
         tokens = [PAD, SOS, EOS, UNK]
         seen = set(tokens)
         for sent in sentences:
@@ -30,8 +30,8 @@ class Tokenizer:
         stoi = {tok: i for i, tok in enumerate(tokens)}
         return cls(stoi=stoi, itos=tokens)
 
-    def encode(self, text: str, add_special_tokens: bool = True) -> List[int]:
-        ids: List[int] = []
+    def encode(self, text: str, add_special_tokens: bool = True) -> list[int]:
+        ids: list[int] = []
         if add_special_tokens:
             ids.append(self.sos_token_id)
         ids.extend(
@@ -41,8 +41,8 @@ class Tokenizer:
             ids.append(self.eos_token_id)
         return ids
 
-    def decode(self, ids: List[int], skip_special_tokens: bool = True) -> str:
-        words: List[str] = []
+    def decode(self, ids: list[int], skip_special_tokens: bool = True) -> str:
+        words: list[str] = []
         for idx in ids:
             tok = self.itos[idx]
             if skip_special_tokens and tok in {SOS, PAD}:
@@ -54,13 +54,13 @@ class Tokenizer:
 
     def __call__(
         self,
-        texts: Union[str, List[str]],
-        padding: Union[bool, str] = False,
+        texts: str | list[str],
+        padding: bool | str = False,
         truncation: bool = False,
         max_length: int | None = None,
         return_tensors: str | None = None,
         add_special_tokens: bool = True,
-    ) -> Dict[str, Union[List[List[int]], torch.Tensor]]:
+    ) -> dict[str, list[list[int]] | torch.Tensor]:
         if isinstance(texts, str):
             texts = [texts]
 
@@ -141,7 +141,7 @@ class HuggingFaceTokenizerAdapter:
 
     @classmethod
     def from_checkpoint_payload(
-        cls, payload: Dict[str, Any]
+        cls, payload: dict[str, Any]
     ) -> "HuggingFaceTokenizerAdapter":
         files = payload.get("files")
         if not isinstance(files, dict) or not files:
@@ -156,7 +156,8 @@ class HuggingFaceTokenizerAdapter:
                     blob, (bytes, bytearray)
                 ):
                     raise ValueError(
-                        "HF-Tokenizerdateien im Checkpoint haben ein ungueltiges Format."
+                        "HF-Tokenizerdateien im Checkpoint haben ein "
+                        "ungueltiges Format."
                     )
                 (tmp_path / name).write_bytes(bytes(blob))
 
@@ -164,7 +165,8 @@ class HuggingFaceTokenizerAdapter:
                 from transformers import AutoTokenizer
             except ImportError as exc:
                 raise ImportError(
-                    "Checkpoint enthaelt HF-Tokenizerdaten, aber 'transformers' ist nicht installiert."
+                    "Checkpoint enthaelt HF-Tokenizerdaten, aber "
+                    "'transformers' ist nicht installiert."
                 ) from exc
             tokenizer = AutoTokenizer.from_pretrained(
                 str(tmp_path), local_files_only=True
@@ -173,21 +175,21 @@ class HuggingFaceTokenizerAdapter:
             return cls(tokenizer, tokenizer_name=tokenizer_name)
         return cls(tokenizer)
 
-    def encode(self, text: str, add_special_tokens: bool = True) -> List[int]:
+    def encode(self, text: str, add_special_tokens: bool = True) -> list[int]:
         return list(self._tokenizer.encode(text, add_special_tokens=add_special_tokens))
 
-    def decode(self, ids: List[int], skip_special_tokens: bool = True) -> str:
+    def decode(self, ids: list[int], skip_special_tokens: bool = True) -> str:
         return str(self._tokenizer.decode(ids, skip_special_tokens=skip_special_tokens))
 
     def __call__(
         self,
-        texts: Union[str, List[str]],
-        padding: Union[bool, str] = False,
+        texts: str | list[str],
+        padding: bool | str = False,
         truncation: bool = False,
         max_length: int | None = None,
         return_tensors: str | None = None,
         add_special_tokens: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         out = self._tokenizer(
             texts,
             padding=padding,
@@ -217,11 +219,11 @@ class HuggingFaceTokenizerAdapter:
     def eos_token_id(self) -> int | None:
         return getattr(self._tokenizer, "eos_token_id", None)
 
-    def to_checkpoint_payload(self) -> Dict[str, Any]:
+    def to_checkpoint_payload(self) -> dict[str, Any]:
         with TemporaryDirectory(prefix="hf_tok_save_") as tmp:
             tmp_path = Path(tmp)
             self._tokenizer.save_pretrained(str(tmp_path))
-            files: Dict[str, bytes] = {}
+            files: dict[str, bytes] = {}
             for path in tmp_path.iterdir():
                 if path.is_file():
                     files[path.name] = path.read_bytes()
@@ -232,7 +234,7 @@ class HuggingFaceTokenizerAdapter:
         }
 
 
-def serialize_tokenizer(tokenizer: TokenizerProtocol) -> Dict[str, Any]:
+def serialize_tokenizer(tokenizer: TokenizerProtocol) -> dict[str, Any]:
     if isinstance(tokenizer, Tokenizer):
         return {
             "provider": "custom",
@@ -247,14 +249,15 @@ def serialize_tokenizer(tokenizer: TokenizerProtocol) -> Dict[str, Any]:
     )
 
 
-def deserialize_tokenizer(payload: Dict[str, Any]) -> TokenizerProtocol:
+def deserialize_tokenizer(payload: dict[str, Any]) -> TokenizerProtocol:
     provider = payload.get("provider", "custom")
     if provider == "custom":
         stoi = payload.get("stoi")
         itos = payload.get("itos")
         if not isinstance(stoi, dict) or not isinstance(itos, list):
             raise ValueError(
-                "Custom-Tokenizerdaten im Checkpoint sind ungueltig oder unvollstaendig."
+                "Custom-Tokenizerdaten im Checkpoint sind ungueltig "
+                "oder unvollstaendig."
             )
         return Tokenizer(stoi=stoi, itos=itos)
     if provider == "hf":

@@ -58,7 +58,9 @@ def _copy_torch_mha_weights_to_simple(
     d_model = torch_attn.embed_dim
     with torch.no_grad():
         simple_attn.q_proj.weight.copy_(torch_attn.in_proj_weight[:d_model, :])
-        simple_attn.k_proj.weight.copy_(torch_attn.in_proj_weight[d_model : 2 * d_model, :])
+        simple_attn.k_proj.weight.copy_(
+            torch_attn.in_proj_weight[d_model : 2 * d_model, :]
+        )
         simple_attn.v_proj.weight.copy_(torch_attn.in_proj_weight[2 * d_model :, :])
         simple_attn.q_proj.bias.copy_(torch_attn.in_proj_bias[:d_model])
         simple_attn.k_proj.bias.copy_(torch_attn.in_proj_bias[d_model : 2 * d_model])
@@ -127,7 +129,9 @@ def test_simple_sdp_is_causal_matches_explicit_causal_mask():
     value = torch.randn(2, 5, 16)
     explicit_causal = torch.triu(torch.ones(5, 5, dtype=torch.bool), diagonal=1)
 
-    out_is_causal, w_is_causal = attn(query, key, value, is_causal=True, need_weights=True)
+    out_is_causal, w_is_causal = attn(
+        query, key, value, is_causal=True, need_weights=True
+    )
     out_explicit, w_explicit = attn(
         query, key, value, attn_mask=explicit_causal, need_weights=True
     )
@@ -184,8 +188,9 @@ def test_simple_sdp_matches_torch_mha_protocol_behavior():
 
 
 def test_simple_sdp_matches_torch_mha_with_same_weights_backdoor():
-    # Intentional backdoor test: we align internal weights to verify strict numerical parity
-    # between two implementations; this cannot be proven by protocol-only blackbox checks.
+    # Intentional backdoor test: we align internal weights to verify strict
+    # numerical parity between both implementations. Protocol-only blackbox
+    # checks cannot prove this level of equivalence.
     torch.manual_seed(1)
     torch_attn = create_attention("torch", 16, 4, 0.0)
     simple_attn = create_attention("simple_sdp", 16, 4, 0.0)

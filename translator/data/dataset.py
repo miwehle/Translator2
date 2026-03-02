@@ -1,5 +1,4 @@
 import random
-from typing import List, Tuple
 
 import torch
 from torch.utils.data import Dataset
@@ -15,7 +14,7 @@ def set_seed(seed: int) -> None:
 class TranslationDataset(Dataset):
     def __init__(
         self,
-        pairs: List[Tuple[str, str]],
+        pairs: list[tuple[str, str]],
         src_tokenizer: TokenizerProtocol,
         tgt_tokenizer: TokenizerProtocol,
     ):
@@ -26,13 +25,13 @@ class TranslationDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> Tuple[List[int], List[int]]:
+    def __getitem__(self, idx: int) -> tuple[list[int], list[int]]:
         return self.data[idx]
 
 
 def collate_fn(
-    batch: List[Tuple[List[int], List[int]]], pad_idx_src: int, pad_idx_tgt: int
-) -> Tuple[torch.Tensor, torch.Tensor]:
+    batch: list[tuple[list[int], list[int]]], pad_idx_src: int, pad_idx_tgt: int
+) -> tuple[torch.Tensor, torch.Tensor]:
     max_src = max(len(src) for src, _ in batch)
     max_tgt = max(len(tgt) for _, tgt in batch)
     bsz = len(batch)
@@ -46,7 +45,7 @@ def collate_fn(
     return src_batch, tgt_batch
 
 
-def tiny_parallel_corpus() -> List[Tuple[str, str]]:
+def tiny_parallel_corpus() -> list[tuple[str, str]]:
     return [
         ("ich bin muede", "i am tired"),
         ("ich bin hungrig", "i am hungry"),

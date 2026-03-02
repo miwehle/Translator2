@@ -31,7 +31,8 @@ def run_pyright_for_files(env: dict[str, str], files: list[str] | None) -> int:
 
     if importlib.util.find_spec("pyright") is None:
         print(
-            "[quality-gate] pyright not found. Install it in your environment, e.g. 'pip install pyright'.",
+            "[quality-gate] pyright not found. Install it in your environment, "
+            "e.g. 'pip install pyright'.",
             file=sys.stderr,
         )
         return 1

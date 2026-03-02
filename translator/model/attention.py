@@ -81,7 +81,8 @@ class SimpleMultiheadSDPAttention(nn.Module):
                     scores = scores.masked_fill(attn_mask.unsqueeze(1), float("-inf"))
                 else:
                     raise ValueError(
-                        "attn_mask with bool dtype must have shape [Lq, Lk] or [B, Lq, Lk]"
+                        "attn_mask with bool dtype must have shape "
+                        "[Lq, Lk] or [B, Lq, Lk]"
                     )
             else:
                 if attn_mask.dim() == 2:

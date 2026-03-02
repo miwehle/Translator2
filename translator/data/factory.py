@@ -1,11 +1,11 @@
-from typing import List, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable
 class TokenizerProtocol(Protocol):
-    def encode(self, text: str, add_special_tokens: bool = True) -> List[int]: ...
+    def encode(self, text: str, add_special_tokens: bool = True) -> list[int]: ...
 
-    def decode(self, ids: List[int], skip_special_tokens: bool = True) -> str: ...
+    def decode(self, ids: list[int], skip_special_tokens: bool = True) -> str: ...
 
     @property
     def vocab_size(self) -> int: ...
@@ -24,7 +24,7 @@ TOKENIZER_CHOICES = ("custom", "hf")
 
 
 def create_tokenizer(
-    tokenizer: str, texts: List[str], hf_tokenizer_name: str
+    tokenizer: str, texts: list[str], hf_tokenizer_name: str
 ) -> TokenizerProtocol:
     from .tokenizer import HuggingFaceTokenizerAdapter, Tokenizer
 
