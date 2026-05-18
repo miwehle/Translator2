@@ -53,7 +53,6 @@ class Seq2Seq(nn.Module):
         self.tgt_pad_idx = tgt_pad_idx
         self.tgt_sos_idx = tgt_sos_idx
         self.d_model = d_model
-        self.max_position_representations = max_position_representations
 
         self.src_embed = nn.Embedding(src_vocab_size, d_model, padding_idx=src_pad_idx)
         self.tgt_embed = nn.Embedding(tgt_vocab_size, d_model, padding_idx=tgt_pad_idx)
