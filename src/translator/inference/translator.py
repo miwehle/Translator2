@@ -8,7 +8,7 @@ import torch
 import yaml
 
 from ..model import Seq2Seq
-from ..training.config import ModelConfig
+from ..training.config import ModelConfig, model_config_from_mapping
 from ..training.internal.checkpointing import checkpoint_manifest_path
 from .tokenizer import TokenizerProtocol, create_tokenizer
 
@@ -53,7 +53,7 @@ def _create_model(
         tgt_pad_idx=int(checkpoint_dataset["tgt_pad_id"]),
         tgt_sos_idx=int(checkpoint_dataset["tgt_bos_id"]),
         dropout=model_config.dropout,
-        max_seq_len=model_config.max_seq_len,
+        max_position_representations=model_config.max_position_representations,
         attention=model_config.attention,
     ).to(device)
 
@@ -82,7 +82,8 @@ class Translator:
         manifest = _load_manifest(checkpoint_file)
         checkpoint_tokenizer = manifest["tokenizer"]
         resolved_device = _resolve_device(device)
-        model = _create_model(ModelConfig(**manifest["model_config"]), checkpoint_tokenizer, resolved_device)
+        model_config = model_config_from_mapping(manifest["model_config"])
+        model = _create_model(model_config, checkpoint_tokenizer, resolved_device)
         payload = torch.load(checkpoint_file, map_location=resolved_device)
         model.load_state_dict(payload["model_state_dict"])
         tokenizer = create_tokenizer("hf", [], checkpoint_tokenizer["model_name"])

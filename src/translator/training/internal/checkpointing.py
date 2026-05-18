@@ -8,7 +8,7 @@ import torch
 import yaml
 
 from ...model import Seq2Seq
-from ..config import ModelConfig
+from ..config import ModelConfig, model_config_from_mapping
 
 _CHECKPOINT_FILE_NAME = "checkpoint.pt"
 _CHECKPOINT_MANIFEST_FILE_NAME = "checkpoint_manifest.yaml"
@@ -35,7 +35,7 @@ def load(checkpoint_path: str | Path, factory: Any, device: torch.device) -> Loa
     manifest = _load_manifest(manifest_path)
     _validate_tokenizer_metadata(manifest["tokenizer"], factory.dataset_metadata)
 
-    model_config = ModelConfig(**manifest["model_config"])
+    model_config = model_config_from_mapping(manifest["model_config"])
     model = factory.create_model(model_config, device)
     optimizer = _create_optimizer(model, manifest["optimizer"])
 

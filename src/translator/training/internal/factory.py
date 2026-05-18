@@ -46,7 +46,7 @@ class Factory:
             tgt_pad_idx=self.dataset_metadata.tgt_pad_id,
             tgt_sos_idx=self.dataset_metadata.tgt_bos_id,
             dropout=model_config.dropout,
-            max_seq_len=model_config.max_seq_len,
+            max_position_representations=model_config.max_position_representations,
             attention=model_config.attention,
         ).to(device)
 

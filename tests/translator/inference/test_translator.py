@@ -96,7 +96,7 @@ class TestTranslator:
         assert model.beam_calls == [([[5, 1], [2, 1]], 11, torch.device("cpu"), 9)]
 
     def test_from_checkpoint_loads_model_and_tokenizer(self, tmp_path: Path, monkeypatch) -> None:
-        model = Seq2Seq(16, 16, 8, 16, 2, 1, 0, 1, 2, dropout=0.0, max_seq_len=32)
+        model = Seq2Seq(16, 16, 8, 16, 2, 1, 0, 1, 2, dropout=0.0, max_position_representations=32)
         checkpoint_path = tmp_path / "checkpoint.pt"
         torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": {}}, checkpoint_path)
         (tmp_path / "checkpoint_manifest.yaml").write_text(

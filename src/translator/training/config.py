@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import field
 from pathlib import Path
 
@@ -17,8 +18,23 @@ class ModelConfig:
     num_heads: int = 8
     num_layers: int = 4
     dropout: float = 0.1
-    max_seq_len: int = 1024
+    max_position_representations: int = 1024
     attention: str = "torch"
+
+
+def model_config_from_mapping(data: Mapping[str, object]) -> ModelConfig:
+    """Build ModelConfig from checkpoint metadata with legacy-key compatibility.
+
+    Supports older checkpoints that stored `max_seq_len` before the field was
+    renamed to `max_position_representations`. This helper can be removed once
+    only checkpoints with `max_position_representations` need to be loaded.
+    """
+    values = dict(data)
+    if "max_seq_len" in values and "max_position_representations" not in values:
+        values["max_position_representations"] = values.pop("max_seq_len")
+    if "max_seq_len" in values:
+        raise ValueError("Model config contains both max_seq_len and max_position_representations.")
+    return ModelConfig(**values)
 
 
 @dataclass(frozen=True, config=_CONFIG)

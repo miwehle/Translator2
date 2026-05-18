@@ -24,7 +24,7 @@ def _make_model(attention: str):
         tgt_pad_idx=0,
         tgt_sos_idx=2,
         dropout=0.0,
-        max_seq_len=32,
+        max_position_representations=32,
         attention=attention,
     )
 

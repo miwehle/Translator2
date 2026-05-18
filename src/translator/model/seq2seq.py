@@ -40,7 +40,7 @@ class Seq2Seq(nn.Module):
         tgt_pad_idx: int,
         tgt_sos_idx: int,
         dropout: float = 0.1,
-        max_seq_len: int = 1024,
+        max_position_representations: int = 1024,
         attention: str = "torch",
     ):
         super().__init__()
@@ -53,11 +53,11 @@ class Seq2Seq(nn.Module):
         self.tgt_pad_idx = tgt_pad_idx
         self.tgt_sos_idx = tgt_sos_idx
         self.d_model = d_model
-        self.max_seq_len = max_seq_len
+        self.max_position_representations = max_position_representations
 
         self.src_embed = nn.Embedding(src_vocab_size, d_model, padding_idx=src_pad_idx)
         self.tgt_embed = nn.Embedding(tgt_vocab_size, d_model, padding_idx=tgt_pad_idx)
-        self.pos_enc = PositionalEncoding(d_model, max_len=max_seq_len)
+        self.pos_enc = PositionalEncoding(d_model, max_len=max_position_representations)
         self.embed_dropout = nn.Dropout(dropout)
 
         self.encoder_layers = nn.ModuleList(

@@ -47,7 +47,7 @@ def _assert_init_handles_configured_seq_len_above_model_limit(
     dataset_path = create_valid_mapped_dataset(tmp_path / "valid_training.mapped")
     ds = cast(Iterable[Example], load_arrow_records(dataset_path))
     factory = _create_factory(ds, configured_max_seq_len=5)
-    model_config = ModelConfig(max_seq_len=4)
+    model_config = ModelConfig(max_position_representations=4)
     warning_messages: list[str] = []
 
     with pytest.raises(ValueError, match="configured_max_seq_len"):
@@ -71,7 +71,7 @@ def _assert_resume_rejects_configured_seq_len_above_model_limit(
     monkeypatch.setattr(
         "translator.training.trainer.load_checkpoint",
         lambda checkpoint_path, factory, device: SimpleNamespace(
-            model=object(), optimizer=object(), model_config=ModelConfig(max_seq_len=4)
+            model=object(), optimizer=object(), model_config=ModelConfig(max_position_representations=4)
         ),
     )
 

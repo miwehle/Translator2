@@ -72,14 +72,14 @@ class Trainer:
         them must be provided.
         """
 
-        def validate_dataset_max_seq_len(max_seq_len: int) -> None:
+        def validate_dataset_fits_model(max_position_representations: int) -> None:
             configured_max_seq_len = getattr(factory.dataset_metadata, "configured_max_seq_len", None)
-            if configured_max_seq_len is None or configured_max_seq_len <= max_seq_len:
+            if configured_max_seq_len is None or configured_max_seq_len <= max_position_representations:
                 return
             message = (
-                "Dataset configured_max_seq_len exceeds model max_seq_len: "
+                "Dataset configured_max_seq_len exceeds model max_position_representations: "
                 "configured_max_seq_len="
-                f"{configured_max_seq_len} max_seq_len={max_seq_len}"
+                f"{configured_max_seq_len} max_position_representations={max_position_representations}"
             )
             if train_config.force:
                 logger.warning("%s; continue because force=True.", message)
@@ -106,14 +106,14 @@ class Trainer:
         if parent_checkpoint is not None:
             checkpoint_path = train_config.training_runs_dir / parent_checkpoint / "checkpoint.pt"
             loaded = load_checkpoint(checkpoint_path, self._factory, self._device)
-            validate_dataset_max_seq_len(loaded.model_config.max_seq_len)
+            validate_dataset_fits_model(loaded.model_config.max_position_representations)
             self._model = loaded.model
             self._optimizer = loaded.optimizer
             self._model_config = loaded.model_config
             return
 
         assert model_config is not None
-        validate_dataset_max_seq_len(model_config.max_seq_len)
+        validate_dataset_fits_model(model_config.max_position_representations)
         self._model_config = model_config
         self._model = self._factory.create_model(model_config, self._device)
         self._optimizer = torch.optim.Adam(self._model.parameters(), lr=train_config.lr)
