@@ -53,7 +53,7 @@ def _create_model(
         tgt_pad_idx=int(checkpoint_dataset["tgt_pad_id"]),
         tgt_sos_idx=int(checkpoint_dataset["tgt_bos_id"]),
         dropout=model_config.dropout,
-        max_len=model_config.max_seq_len,
+        max_seq_len=model_config.max_seq_len,
         attention=model_config.attention,
     ).to(device)
 

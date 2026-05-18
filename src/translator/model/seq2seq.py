@@ -20,6 +20,10 @@ class PositionalEncoding(nn.Module):
         self.register_buffer("pe", pe.unsqueeze(0))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.size(1) > self.pe.size(1):
+            raise ValueError(
+                f"Sequence length exceeds positional encoding max_len: {x.size(1)} > {self.pe.size(1)}"
+            )
         return x + self.pe[:, : x.size(1)]
 
 
@@ -36,7 +40,7 @@ class Seq2Seq(nn.Module):
         tgt_pad_idx: int,
         tgt_sos_idx: int,
         dropout: float = 0.1,
-        max_len: int = 1024,
+        max_seq_len: int = 1024,
         attention: str = "torch",
     ):
         super().__init__()
@@ -49,11 +53,11 @@ class Seq2Seq(nn.Module):
         self.tgt_pad_idx = tgt_pad_idx
         self.tgt_sos_idx = tgt_sos_idx
         self.d_model = d_model
-        self.max_len = max_len
+        self.max_seq_len = max_seq_len
 
         self.src_embed = nn.Embedding(src_vocab_size, d_model, padding_idx=src_pad_idx)
         self.tgt_embed = nn.Embedding(tgt_vocab_size, d_model, padding_idx=tgt_pad_idx)
-        self.pos_enc = PositionalEncoding(d_model, max_len=max_len)
+        self.pos_enc = PositionalEncoding(d_model, max_len=max_seq_len)
         self.embed_dropout = nn.Dropout(dropout)
 
         self.encoder_layers = nn.ModuleList(
@@ -124,7 +128,6 @@ class Seq2Seq(nn.Module):
         """
         src = torch.tensor([src_ids], dtype=torch.long, device=device)
         memory, src_key_padding_mask = self.encode(src)
-        max_len = min(max_len, self.max_len - 1)
 
         out_ids: list[int] = [self.tgt_sos_idx]
         for _ in range(max_len):
@@ -158,7 +161,6 @@ class Seq2Seq(nn.Module):
 
         src = torch.tensor([src_ids], dtype=torch.long, device=device)
         memory, src_key_padding_mask = self.encode(src)
-        max_len = min(max_len, self.max_len - 1)
         beams: list[tuple[list[int], float]] = [([self.tgt_sos_idx], 0.0)]
 
         for _ in range(max_len):
@@ -205,7 +207,6 @@ class Seq2Seq(nn.Module):
 
         src = self._pad_id_batch(src_ids_batch, self.src_pad_idx, device)
         memory, src_key_padding_mask = self.encode(src)
-        max_len = min(max_len, self.max_len - 1)
         eos = torch.tensor(eos_idx, dtype=torch.long, device=device)
         out_ids = torch.full((len(src_ids_batch), 1), self.tgt_sos_idx, dtype=torch.long, device=device)
         finished = torch.zeros(len(src_ids_batch), dtype=torch.bool, device=device)
@@ -251,7 +252,6 @@ class Seq2Seq(nn.Module):
 
         src = self._pad_id_batch(src_ids_batch, self.src_pad_idx, device)
         memory, src_key_padding_mask = self.encode(src)
-        max_len = min(max_len, self.max_len - 1)
         beams_by_example: list[list[tuple[list[int], float]]] = [
             [([self.tgt_sos_idx], 0.0)] for _ in src_ids_batch
         ]

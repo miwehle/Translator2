@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from translator.model.attention import SimpleMultiheadSDPAttention
 from translator.model import Seq2Seq
+from translator.model.attention import SimpleMultiheadSDPAttention
 from translator.model.factory import ATTENTION_CHOICES, AttentionProtocol, create_attention
 
 
@@ -24,7 +24,7 @@ def _make_model(attention: str):
         tgt_pad_idx=0,
         tgt_sos_idx=2,
         dropout=0.0,
-        max_len=32,
+        max_seq_len=32,
         attention=attention,
     )
 
