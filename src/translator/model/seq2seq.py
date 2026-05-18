@@ -8,7 +8,7 @@ from .factory import ATTENTION_CHOICES
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, max_len: int = 1024):
+    def __init__(self, d_model: int, max_len: int):
         super().__init__()
         pos = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
@@ -39,9 +39,9 @@ class Seq2Seq(nn.Module):
         src_pad_idx: int,
         tgt_pad_idx: int,
         tgt_sos_idx: int,
-        dropout: float = 0.1,
-        max_position_representations: int = 1024,
-        attention: str = "torch",
+        dropout: float,
+        max_position_representations: int,
+        attention: str,
     ):
         super().__init__()
         if d_model % num_heads != 0:
