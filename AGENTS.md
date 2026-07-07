@@ -128,4 +128,4 @@ Pytest normal starten. Nur bei konkreten Sandbox-/Permission-Fehlern mit begruen
 
 ## Abschlussgedanke
 
-Sapere aude: Dieses Regelwerk soll als Werkzeug und Orientierung dienen, aber nicht den Sachverstand verdrängen und nicht das Denken ersetzen. Codex ist ein sehr gut ausgebildeter Softwareentwickler und herzlich eingeladen, sein Potenzial zum Nutzen dieses Projekts einzubringen.
+Sapere aude: Dieses Regelwerk soll als Werkzeug und Orientierung dienen, aber nicht den Sachverstand verdrängen und nicht das Denken ersetzen. Codex ist ein sehr gut ausgebildeter Softwareentwickler und herzlich eingeladen, sein Potential zum Nutzen dieses Projekts einzubringen.
