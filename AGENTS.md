@@ -36,6 +36,7 @@ Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind
 3.5 Tests priorisieren die öffentliche API. Sonst entstehen leicht Tests, die fragil sind oder Refactorings des Production-Codes erschweren.
 3.6 Nicht-öffentliche Objekte können eigene Tests haben, wenn sie substanzielle Fachlogik tragen oder die Tests über die öffentliche API unhandlich würden. Auch solche Tests folgen möglichst der Struktur des Production-Codes.
 3.7 Nicht jedes öffentliche Production-Objekt benötigt einen eigenen Test. Der Schwerpunkt soll dort liegen, wo die Dichte der Fachlogik hoch ist; triviale Getter sind im Regelfall kein eigener Testgegenstand.
+3.8 Die 1:1-Zuordnung ist eine Strukturregel für auffindbare Tests, keine Pflicht zur vollständigen Spiegelung jeder trivialen Production-Struktur.
 
 ### 4 Integrationstests
 4.1 Tests für Zusammensetzungen mehrerer Production-Bausteine sind erlaubt.  
@@ -61,6 +62,12 @@ Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind
 6.6 Solche Details gehoeren, wenn fachlich relevant, in kleine und gezielte Tests des zustaendigen Moduls.
 6.7 Wenn eine kleine produktive Umbenennung oder lokale interne Aenderung viele Testanpassungen ausloest, ist das als `Fragile/Brittle Test`-Smell zu behandeln.
 6.8 Vor weiterem Ausbau des Testcodes ist dann kurz zu pruefen, ob `Extract Helper`, kleine Fixtures oder benannte Konstanten die Duplikation verringern und die Kopplung an Implementierungsdetails reduzieren.
+
+### 7 Verhalten vor Implementierung
+7.1 Tests sollen im Regelfall ein von außen beobachtbares Verhalten der getesteten API prüfen, nicht den internen Ablauf der Implementierung nachbauen.
+7.2 Ein Test soll möglichst aus dem Blickwinkel eines Nutzers der getesteten API formuliert sein: Gegeben ist ein Zustand oder Input, ausgeführt wird eine Operation, erwartet wird ein Ergebnis oder Effekt.
+7.3 Interne Zwischenschritte, Aufrufreihenfolgen und Hilfsdetails sollen nur geprüft werden, wenn sie selbst fachlich relevant sind oder sonst ein wichtiger Fehler unentdeckt bliebe.
+7.4 Wenn ein Refactoring ohne Verhaltensänderung viele Tests bricht, ist das ein Hinweis, dass die Tests zu stark an Implementierungsdetails gekoppelt sind.
 
 ### Nutzen und Zweck
 - Die 1:1-Zuordnung schafft Ordnung im Testcode. Sie macht klar, wo welcher Test zu erwarten ist und was getestet ist und was nicht.
@@ -118,3 +125,7 @@ Temporäre Verzeichnisse und Dateien für Tests, Verifikation und ad-hoc Läufe 
 Keine neuen temporären Root-Ordner wie `.tmp_pytest*`, `.pytest_tmp*` oder ähnliche Namen anlegen.
 
 Pytest normal starten. Nur bei konkreten Sandbox-/Permission-Fehlern mit begruendeter Eskalation erneut ausfuehren.
+
+## Abschlussgedanke
+
+Sapere aude: Dieses Regelwerk soll als Werkzeug und Orientierung dienen, aber nicht den Sachverstand verdrängen und nicht das Denken ersetzen. Codex ist ein sehr gut ausgebildeter Softwareentwickler und herzlich eingeladen, sein Potenzial zum Nutzen dieses Projekts einzubringen.
