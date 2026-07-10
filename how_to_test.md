@@ -27,9 +27,10 @@ Konkret bedeutet die Symmetrie:
 - Der Name des Test-Moduls entspricht dem Namen des Production-Moduls, z. B. `foo.py` und `test_foo.py`.
 - Zu jeder relevanten öffentlichen Funktion gibt es mindestens eine Testfunktion.
 - Der Name einer Testfunktion greift den Namen der getesteten Funktion auf, z. B. `test_divide()` zu `divide(...)`. Bei mehreren Testfunktionen wird der getestete Aspekt ergänzt, z. B. `test_divide_by_zero_raises_error()`.
-- Tests zu einer Production-Klasse werden im Test-Modul in einer Testklasse `Test<Klassenname>` gebündelt. Die Testmethoden orientieren sich an der öffentlichen API der Production-Klasse.
-- Der Modulname soll nicht in der Testfunktion wiederholt werden.
-- Der Klassenname soll nicht in der Testmethode wiederholt werden, wenn die Testklasse ihn schon trägt.
+- Tests zu einer Production-Klasse werden im Testmodul in einer Testklasse `Test<Klassenname>` gebündelt. Die Testmethoden orientieren sich an der öffentlichen API der Production-Klasse.
+- Freie Production-Funktionen werden durch freie Testfunktionen getestet; für sie wird keine Testklasse eingeführt.
+- Die Reihenfolge der Testklassen und freien Testfunktionen folgt möglichst der Reihenfolge der getesteten öffentlichen Objekte im Production-Modul.
+- Der Modulname soll nicht im Namen der Testfunktion wiederholt werden. Der Klassenname soll nicht in der Testmethode wiederholt werden, wenn die Testklasse ihn schon trägt.
 
 Die Symmetrie bedeutet nicht, private Hilfsmethoden oder triviale Getter zu spiegeln.
 

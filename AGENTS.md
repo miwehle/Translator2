@@ -15,7 +15,8 @@ Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind
 
 ## Testcode
 
-Für Testcode bitte die Regeln in how_to_test.md beachten.
+Für Testcode gelten verbindlich die Regeln in `how_to_test.md`; vor Änderungen an Testcode ist diese Datei zu lesen. Die Regeln dort sind Teil dieser AGENTS.md-Anweisungen.
+
 
 ## Production-Code-Aenderungen
 
