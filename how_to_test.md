@@ -23,7 +23,7 @@ Diese Symmetrie hat folgende Vorteile:
 
 Konkret bedeutet die Symmetrie:
 
-- Zu einem Production-Modul gibt es ein korrespondierendes Test-Modul.
+- *Test Module per Module*: Zu einem Production-Modul gibt es ein korrespondierendes Test-Modul.[^1]
 - Der Name des Test-Moduls entspricht dem Namen des Production-Moduls, z. B. `foo.py` und `test_foo.py`.
 - Zu jeder relevanten öffentlichen Funktion gibt es mindestens eine Testfunktion.
 - Der Name einer Testfunktion greift den Namen der getesteten Funktion auf, z. B. `test_divide()` zu `divide(...)`. Bei mehreren Testfunktionen wird der getestete Aspekt ergänzt, z. B. `test_divide_by_zero_raises_error()`.
@@ -43,18 +43,18 @@ Die Symmetrie bedeutet nicht, private Hilfsmethoden oder triviale Getter zu spie
 
 > Halte auch den Test-Code einfach.
 
-- Auch für Tests gilt das KISS-Prinzip. Test-Code soll möglichst klein, zielgerichtet und mit geringer mentaler Last bleiben.
-- Auch bei Test-Code aktiv prüfen, ob eine kleine Vereinfachung oder ein kleines Refactoring bestehenden Test-Code vereinfachen und `LOC` sparen kann.
-- Vor größeren Refactorings am Test-Code kurz beschreiben, was vereinfacht werden soll, und ein Go einholen.
+- Auch für Tests gilt das *KISS-Prinzip*. Test-Code soll möglichst klein, zielgerichtet und mit geringer mentaler Last bleiben.
+- Auch bei Test-Code aktiv prüfen, ob eine kleine Vereinfachung oder ein kleines Refactoring bestehenden Test-Code vereinfachen und *LOC sparen* kann.
+- Vor größerem Refactoring am Test-Code kurz beschreiben, was vereinfacht werden soll, und ein Go einholen.
 
 ## DRY-Prinzip
 
 > Vermeide duplizierten Test-Code.
 
-- Das DRY-Prinzip gilt im gesamten Workspace ausdrücklich auch für Test-Code, wenn dadurch `LOC` und Redundanz kleiner bleiben.
-- Unnötige Duplikation ist in Test-Code ebenso zu vermeiden wie in Production-Code.
+- Das *DRY-Prinzip* gilt im gesamten Workspace ausdrücklich auch für Test-Code, wenn dadurch LOC und Redundanz kleiner bleiben.
+- Unnötige [Duplikation](http://xunitpatterns.com/Test%20Code%20Duplication.html) ist in Test-Code ebenso zu vermeiden wie in Production-Code.
 - DRY zielt in Tests vor allem auf Wissensduplikation, nicht auf jede kleine lokale Wiederholung. Tests sollen lokal lesbar bleiben.
-- Wenn mehrere Tests dasselbe wiederholen (z. B. einen Pfad oder Config-Wert), ist eine kleine gemeinsame Test-Hilfe, Konstante oder Fixture zu bevorzugen (`Single Source of Truth`).
+- Wenn mehrere Tests dasselbe wiederholen (z. B. einen Pfad oder Config-Wert), ist eine kleine gemeinsame Test-Hilfe, Konstante oder Fixture zu bevorzugen (*Single Source of Truth*).
 
 ## Was getestet wird
 
@@ -65,7 +65,7 @@ Die Symmetrie bedeutet nicht, private Hilfsmethoden oder triviale Getter zu spie
 - Denn Tests von Interna machen Umstrukturierungen und Refactoring oft schwerer.
 - Was mit öffentlicher API gemeint ist:
 	- Namen mit führendem `_` gelten als private Implementierungsdetails und sollen im Regelfall nicht direkt getestet werden. Öffentlich ist ein Name grundsätzlich dann, wenn er nicht mit `_` beginnt.
-	- Wenn die umgebende Struktur privat ist, z. B. ein Modul oder eine Klasse mit führendem `_`, gelten auch ihre enthaltenen Namen im Regelfall als privat.
+	- Wenn die umgebende Struktur privat ist, z. B. ein Modul oder eine Klasse mit führendem `_`, gelten auch ihre enthaltenen Namen als privat.
 	- Eine Package- oder Bibliotheks-API kann enger sein als die Menge aller öffentlichen Modulnamen. Sie wird über die dokumentierte Package-Oberfläche festgelegt, z. B. über `__init__.py` oder ein API-Modul.
 - Tests sollen im Regelfall ein von außen beobachtbares Verhalten der getesteten API prüfen, nicht den internen Ablauf der Implementierung nachbauen.
 - Ein Test soll möglichst aus dem Blickwinkel eines Nutzers der getesteten API formuliert sein: Gegeben ist ein Zustand oder Input, ausgeführt wird eine Operation, erwartet wird ein Ergebnis oder Effekt.
@@ -74,8 +74,15 @@ Die Symmetrie bedeutet nicht, private Hilfsmethoden oder triviale Getter zu spie
 
 > Kernkomponenten sind Schwerpunkte der Tests. 
 
-- Kernkomponenten sind die Komponenten, wo die Dichte der Fachlogik hoch ist, wo in der Implementierung "die Musik spielt".
-- Eine Kernkomponente wird als zumindest in ihrem Paket öffentlich vorausgesetzt. Eine Kernkomponente mit führendem `_` ist im Regelfall ein Design-Smell: entweder ist sie fälschlich privat markiert, oder sie ist keine Kernkomponente.
+- *Kernkomponenten* sind die Komponenten, wo die *Dichte der Fachlogik* hoch ist, also wo in der Implementierung "die Musik spielt".
+- Eine Kernkomponente wird als zumindest in ihrem Paket öffentlich vorausgesetzt. Eine Kernkomponente mit führendem `_` ist im Regelfall ein Design-Smell.
+- Eine Kernkomponente soll im Docstring als solche erkennbar sein.
+
+Beispiel:
+```
+class StudyRunner:
+    """Core component for running one HPO study in a study series."""
+```
 
 ## Was nicht direkt getestet wird
 
@@ -85,8 +92,22 @@ Die Symmetrie bedeutet nicht, private Hilfsmethoden oder triviale Getter zu spie
 
 Relevantes Verhalten wird stattdessen über die öffentliche API oder über Kernkomponenten getestet.
 
+## Testdichte
+
+Kurzfassung der zwei vorigen Abschnitte: Die Testdichte folgt grob dieser Priorität:
+
+> private Unit < triviale public Unit < normale public Unit < Kernkomponente
+
+- Private Units werden im Regelfall nicht direkt getestet.
+- Triviale public Units, z. B. reine Getter oder Weiterleitungen, brauchen meist keine eigenen Tests.
+- Normale public Units werden über ihr relevantes Verhalten getestet.
+- Kernkomponenten werden besonders sorgfältig getestet.
+- Also: Die Testdichte entspricht der Dichte der Fachlogik im public Production-Code.
+
 ## Fragile Tests vermeiden
 
-- Wenn eine kleine produktive Umbenennung oder lokale interne Änderung viele Testanpassungen auslöst, ist das als `Fragile Test`-Smell zu behandeln.
-- Vor weiterem Ausbau des Test-Codes ist dann kurz zu prüfen, ob `Extract Helper`, kleine Fixtures oder benannte Konstanten die Duplikation verringern und die Kopplung an Implementierungsdetails reduzieren.
+- Wenn eine kleine produktive Umbenennung oder lokale interne Änderung viele Testanpassungen auslöst, ist das als [Fragile Test](http://xunitpatterns.com/Fragile%20Test.html)-Smell zu behandeln.
+- Vor weiterem Ausbau des Test-Codes ist dann kurz zu prüfen, ob *Extract Helper*, kleine *Fixtures* oder benannte Konstanten die Duplikation verringern und die Kopplung an Implementierungsdetails reduzieren.
 - Wenn ein Refactoring ohne Verhaltensänderung viele Tests bricht, ist das ein Hinweis, dass die Tests zu stark an Implementierungsdetails gekoppelt sind.
+
+[^1]: Vgl. [Testcase Class per Class](http://xunitpatterns.com/Testcase%20Class%20per%20Class.html). Das ist das Analogon in Java, wo jede Funktion zu einer Klasse gehört.
