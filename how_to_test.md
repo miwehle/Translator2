@@ -51,12 +51,10 @@ Die Symmetrie bedeutet nicht, private Hilfsmethoden oder triviale Getter zu spie
 
 > Vermeide duplizierten Test-Code.
 
-- Das DRY-Prinzip gilt im gesamten Workspace ausdrücklich auch für Test-Code.
+- Das DRY-Prinzip gilt im gesamten Workspace ausdrücklich auch für Test-Code, wenn dadurch `LOC` und Redundanz kleiner bleiben.
 - Unnötige Duplikation ist in Test-Code ebenso zu vermeiden wie in Production-Code.
-- Bestehenden Test-Code bevorzugt geschickt wiederverwenden und erweitern, wenn dadurch Diff, `LOC` und Redundanz kleiner bleiben.
 - DRY zielt in Tests vor allem auf Wissensduplikation, nicht auf jede kleine lokale Wiederholung. Tests sollen lokal lesbar bleiben.
-- Wenn mehrere Tests denselben fachlichen Begriff, denselben Pfadbaustein, dieselbe Benennung, denselben Config-Wert oder dasselbe Setup wiederholen, ist eine kleine gemeinsame Test-Hilfe, Konstante oder Fixture zu bevorzugen.
-- Fachlich benannte Literale wie Pfade, Verzeichnisnamen, Dateinamen und Config-Werte sollen im Test-Code nach Möglichkeit nur an einer Stelle definiert werden (`Single Source of Truth`).
+- Wenn mehrere Tests dasselbe wiederholen (z. B. einen Pfad oder Config-Wert), ist eine kleine gemeinsame Test-Hilfe, Konstante oder Fixture zu bevorzugen (`Single Source of Truth`).
 
 ## Was getestet wird
 
