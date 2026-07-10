@@ -62,8 +62,11 @@ Die Symmetrie bedeutet nicht, private Hilfsmethoden oder triviale Getter zu spie
 
 > Tests sollen die öffentliche API priorisieren.
 
-- Denn Tests von Interna machen Umstrukturierungen und Refactorings oft schwerer.
-- Die öffentliche API ist, was über das zuständige `__init__.py` öffentlich gemacht wird. Das betrifft Module, Klassen und Funktionen.  
+- Denn Tests von Interna machen Umstrukturierungen und Refactoring oft schwerer.
+- Was mit öffentlicher API gemeint ist:
+	- Namen mit führendem `_` gelten als private Implementierungsdetails und sollen im Regelfall nicht direkt getestet werden. Öffentlich ist ein Name grundsätzlich dann, wenn er nicht mit `_` beginnt.
+	- Wenn die umgebende Struktur privat ist, z. B. ein Modul oder eine Klasse mit führendem `_`, gelten auch ihre enthaltenen Namen im Regelfall als privat.
+	- Eine Package- oder Bibliotheks-API kann enger sein als die Menge aller öffentlichen Modulnamen. Sie wird über die dokumentierte Package-Oberfläche festgelegt, z. B. über `__init__.py` oder ein API-Modul.
 - Tests sollen im Regelfall ein von außen beobachtbares Verhalten der getesteten API prüfen, nicht den internen Ablauf der Implementierung nachbauen.
 - Ein Test soll möglichst aus dem Blickwinkel eines Nutzers der getesteten API formuliert sein: Gegeben ist ein Zustand oder Input, ausgeführt wird eine Operation, erwartet wird ein Ergebnis oder Effekt.
 
@@ -71,8 +74,9 @@ Die Symmetrie bedeutet nicht, private Hilfsmethoden oder triviale Getter zu spie
 
 > Kernkomponenten sind Schwerpunkte der Tests. 
 
-- Das gilt auch für Kernkomponenten, die nicht direkt durch die öffentliche API aufgerufen werden (quasi "innere Organe").
-- Kernkomponenten sind die Komponenten, wo die Dichte der Fachlogik hoch ist, wo "die Musik spielt".
+- Kernkomponenten sind die Komponenten, wo die Dichte der Fachlogik hoch ist, wo in der Implementierung "die Musik spielt".
+- Eine Kernkomponente wird als zumindest in ihrem Paket öffentlich vorausgesetzt. Eine Kernkomponente mit führendem `_` ist im Regelfall ein Design-Smell: entweder ist sie fälschlich privat markiert, oder sie ist keine Kernkomponente.
+
 ## Was nicht direkt getestet wird
 
 - Private Hilfsmethoden werden im Regelfall nicht direkt getestet.
