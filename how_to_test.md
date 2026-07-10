@@ -83,6 +83,6 @@ Relevantes Verhalten wird stattdessen über die öffentliche API oder über Kern
 
 ## Fragile Tests vermeiden
 
-- Wenn eine kleine produktive Umbenennung oder lokale interne Änderung viele Testanpassungen auslöst, ist das als `Fragile/Brittle Test`-Smell zu behandeln.
+- Wenn eine kleine produktive Umbenennung oder lokale interne Änderung viele Testanpassungen auslöst, ist das als `Fragile Test`-Smell zu behandeln.
 - Vor weiterem Ausbau des Test-Codes ist dann kurz zu prüfen, ob `Extract Helper`, kleine Fixtures oder benannte Konstanten die Duplikation verringern und die Kopplung an Implementierungsdetails reduzieren.
 - Wenn ein Refactoring ohne Verhaltensänderung viele Tests bricht, ist das ein Hinweis, dass die Tests zu stark an Implementierungsdetails gekoppelt sind.
