@@ -54,7 +54,9 @@ Die Symmetrie bedeutet nicht, private Hilfsmethoden oder triviale Getter zu spie
 - Das *DRY-Prinzip* gilt im gesamten Workspace ausdrücklich auch für Test-Code, wenn dadurch LOC und Redundanz kleiner bleiben.
 - Unnötige [Duplikation](http://xunitpatterns.com/Test%20Code%20Duplication.html) ist in Test-Code ebenso zu vermeiden wie in Production-Code.
 - DRY zielt in Tests vor allem auf Wissensduplikation, nicht auf jede kleine lokale Wiederholung. Tests sollen lokal lesbar bleiben.
-- Wenn mehrere Tests dasselbe wiederholen (z. B. einen Pfad oder Config-Wert), ist eine kleine gemeinsame Test-Hilfe, Konstante oder Fixture zu bevorzugen (*Single Source of Truth*).
+- Wenn mehrere Tests dasselbe wiederholen (z. B. einen Pfad oder Config-Wert), besser eine *Single Source of Truth* verwenden:
+	- Benannte Konstante, [Test-Helfer](http://xunitpatterns.com/Test%20Helper.html), Fixture 
+	- Parametrisierter Test: `pytest.mark.parametrize`
 
 ## Was getestet wird
 
@@ -87,22 +89,19 @@ class StudyRunner:
 ## Was nicht direkt getestet wird
 
 - Private Hilfsmethoden werden im Regelfall nicht direkt getestet.
-- Triviale Getter, einfache Datenzugriffe und reine Weiterleitungen brauchen keine eigenen Tests.
+- Triviale public Funktionen ohne nennenswerte Logik, z. B. einfache Datenzugriffe und reine Weiterleitungen, brauchen keine eigenen Tests.
 - Solche Tests erhöhen oft die Kopplung an die Implementierung und machen Refactorings fragil.
 
 Relevantes Verhalten wird stattdessen über die öffentliche API oder über Kernkomponenten getestet.
 
 ## Testdichte
 
-Kurzfassung der zwei vorigen Abschnitte: Die Testdichte folgt grob dieser Priorität:
+Also: Die Testdichte folgt grob dieser Priorität:
 
-> private Unit < triviale public Unit < normale public Unit < Kernkomponente
+> ( private Unit < triviale public Unit < ) normale public Unit < Kernkomponente
 
-- Private Units werden im Regelfall nicht direkt getestet.
-- Triviale public Units, z. B. reine Getter oder Weiterleitungen, brauchen meist keine eigenen Tests.
-- Normale public Units werden über ihr relevantes Verhalten getestet.
-- Kernkomponenten werden besonders sorgfältig getestet.
-- Also: Die Testdichte entspricht der Dichte der Fachlogik im public Production-Code.
+- Das Eingeklammerte wird im Regelfall nicht direkt getestet.
+- Die Testdichte entspricht der Dichte der Fachlogik im public Production-Code.
 
 ## Fragile Tests vermeiden
 
