@@ -13,66 +13,9 @@ Keine stillschweigende Code-Duplizierung bei Refactorings; Duplikationen muessen
 
 Provisorische Workarounds, Debug-Helfer und asymmetrische Zwischenloesungen sind nach Klaerung der Ursache im selben Task wieder zu entfernen oder explizit zu begruenden; kein liegengebliebenes "temporary fix".
 
-## Struktur und Benennung von Testcode
+## Testcode
 
-### 1 Grundprinzip
-1.1 Testcode soll klar strukturiert und klar benannt sein.  
-1.2 Testcode folgt einer 1:1-Korrespondenz zum Production-Code.  
-1.3 Abweichungen davon sind zu begründen.
-1.4 Auch fuer Unit-Tests gilt das KISS-Prinzip. Testcode soll moeglichst klein, zielgerichtet und mit geringer mentaler Last bleiben.
-1.5 Bestehenden Testcode bevorzugt geschickt wiederverwenden und erweitern, wenn dadurch Diff, `LOC` und Redundanz kleiner bleiben.
-1.6 Auch bei Testcode aktiv prüfen, ob eine kleine Vereinfachung oder ein kleines Refactoring bestehenden Testcode vereinfachen und `LOC` sparen kann.
-1.7 Vor groesseren Refactorings am Testcode kurz beschreiben, was vereinfacht werden soll, und ein Go einholen.
-
-### 2 Definition von "öffentlich"
-2.1 Öffentlich ist ausschließlich, was über das zuständige `__init__.py` öffentlich gemacht wird.  
-2.2 Das betrifft Module, Klassen und Funktionen.  
-
-### 3 Strukturierung von Testcode
-3.1 Production-Modul <-> korrespondierendes Test-Modul.  
-3.2 Production-Klasse <-> im Regelfall korrespondierende Test-Klasse.  
-3.3 Production-Funktion oder -Methode <-> korrespondierende Test-Funktion oder Test-Methode.  
-3.4 Diese Zuordnung ist verbindlich. Abweichungen sind zu begründen.
-3.5 Tests priorisieren die öffentliche API. Sonst entstehen leicht Tests, die fragil sind oder Refactorings des Production-Codes erschweren.
-3.6 Nicht-öffentliche Objekte können eigene Tests haben, wenn sie substanzielle Fachlogik tragen oder die Tests über die öffentliche API unhandlich würden. Auch solche Tests folgen möglichst der Struktur des Production-Codes.
-3.7 Nicht jedes öffentliche Production-Objekt benötigt einen eigenen Test. Der Schwerpunkt soll dort liegen, wo die Dichte der Fachlogik hoch ist; triviale Getter sind im Regelfall kein eigener Testgegenstand.
-3.8 Die 1:1-Zuordnung ist eine Strukturregel für auffindbare Tests, keine Pflicht zur vollständigen Spiegelung jeder trivialen Production-Struktur.
-
-### 4 Integrationstests
-4.1 Tests für Zusammensetzungen mehrerer Production-Bausteine sind erlaubt.  
-4.2 Sie gehören nicht zur 1:1-Zuordnung.  
-4.3 Sie liegen getrennt unter `tests/integration`.
-
-### 5 Benennung von Testcode
-5.1 Testnamen sollen den getesteten Production-Code direkt erkennbar machen.  
-5.2 Ein beschreibender Suffix am Ende des Namens ist erlaubt.  
-5.3 Testdatei: `test_<modulname>.py`.  
-5.4 Testklasse: `Test<Klassenname>`.  
-5.5 Testmethode: `test_<methodenname>...`.  
-5.6 Freie Testfunktion: `test_<funktionsname>...`.  
-5.7 Der Modulname soll nicht in der Testfunktion wiederholt werden.  
-5.8 Der Klassenname soll nicht in der Testmethode wiederholt werden, wenn die Testklasse ihn schon trägt.
-
-### 6 DRY auch im Testcode
-6.1 Das DRY-Prinzip gilt im gesamten Workspace ausdruecklich auch fuer Testcode.
-6.2 Wissensduplikation ist in Testcode ebenso zu vermeiden wie in Production-Code.
-6.3 Wenn mehrere Tests denselben fachlichen Begriff, denselben Pfadbaustein, dieselbe Benennung, denselben Config-Wert oder dasselbe Setup wiederholen, ist eine kleine gemeinsame Test-Hilfe, Konstante oder Fixture zu bevorzugen.
-6.4 Fachlich benannte Literale wie Pfade, Verzeichnisnamen, Dateinamen und Config-Werte sollen im Testcode nach Moeglichkeit nur an einer Stelle definiert werden (`Single Source of Truth`).
-6.5 Tests sollen primaer das Verhalten der oeffentlichen API absichern. Interne Verdrahtung, Pfadableitungen und Implementierungsdetails sollen nicht redundant in vielen Tests nachgebaut werden.
-6.6 Solche Details gehoeren, wenn fachlich relevant, in kleine und gezielte Tests des zustaendigen Moduls.
-6.7 Wenn eine kleine produktive Umbenennung oder lokale interne Aenderung viele Testanpassungen ausloest, ist das als `Fragile/Brittle Test`-Smell zu behandeln.
-6.8 Vor weiterem Ausbau des Testcodes ist dann kurz zu pruefen, ob `Extract Helper`, kleine Fixtures oder benannte Konstanten die Duplikation verringern und die Kopplung an Implementierungsdetails reduzieren.
-
-### 7 Verhalten vor Implementierung
-7.1 Tests sollen im Regelfall ein von außen beobachtbares Verhalten der getesteten API prüfen, nicht den internen Ablauf der Implementierung nachbauen.
-7.2 Ein Test soll möglichst aus dem Blickwinkel eines Nutzers der getesteten API formuliert sein: Gegeben ist ein Zustand oder Input, ausgeführt wird eine Operation, erwartet wird ein Ergebnis oder Effekt.
-7.3 Interne Zwischenschritte, Aufrufreihenfolgen und Hilfsdetails sollen nur geprüft werden, wenn sie selbst fachlich relevant sind oder sonst ein wichtiger Fehler unentdeckt bliebe.
-7.4 Wenn ein Refactoring ohne Verhaltensänderung viele Tests bricht, ist das ein Hinweis, dass die Tests zu stark an Implementierungsdetails gekoppelt sind.
-
-### Nutzen und Zweck
-- Die 1:1-Zuordnung schafft Ordnung im Testcode. Sie macht klar, wo welcher Test zu erwarten ist und was getestet ist und was nicht.
-- Das Regelwerk lenkt Testaufwand auf die öffentliche API. So wächst der Testcode nicht ungeordnet entlang interner Implementierungsdetails.
-- Das Regelwerk folgt bewährten Testmustern aus Gerard Meszaros, *xUnit Test Patterns*, insbesondere der klaren Zuordnung im Sinne von `Testcase Class per Class` und `Test Method`. Es verbessert so Auffindbarkeit, Verständlichkeit und Wartbarkeit des Testcodes.
+Für Testcode bitte die Regeln in how_to_test.md beachten.
 
 ## Production-Code-Aenderungen
 
